@@ -39,12 +39,12 @@ class NeuralModule:
 
     def _init_graph(self):
         """ Create a random graph for this module. """
-        self.graph = nx.DiGraph()
+        self.abstract_graph = nx.DiGraph()
 
         # Internal nodes.
-        self.graph.add_nodes_from(range(self.child_count))
+        self.abstract_graph.add_nodes_from(range(self.child_count))
 
-        nodes = set(self.graph.nodes())
+        nodes = set(self.abstract_graph.nodes())
 
         input_k = rnd.randint(1, self.child_count)
         input_nodes = rnd.sample(nodes,k=input_k)
@@ -56,15 +56,15 @@ class NeuralModule:
         output_edges = [(idx, NODE_OUTPUT_TAG) for idx in output_nodes]
 
         # Add input & output nodes.
-        self.graph.add_nodes_from([NODE_INPUT_TAG, NODE_OUTPUT_TAG])
+        self.abstract_graph.add_nodes_from([NODE_INPUT_TAG, NODE_OUTPUT_TAG])
         
         # Connect internal nodes to the input & output.
-        self.graph.add_edges_from(input_edges)
-        self.graph.add_edges_from(output_edges)
+        self.abstract_graph.add_edges_from(input_edges)
+        self.abstract_graph.add_edges_from(output_edges)
 
         # Get nodes with no incoming connections.
-        no_input_nodes = [k for k,v in self.graph.in_degree() if v == 0 and k != NODE_INPUT_TAG]
-        no_output_nodes = [k for k,v in self.graph.out_degree() if v == 0 and k != NODE_OUTPUT_TAG]
+        no_input_nodes = [k for k,v in self.abstract_graph.in_degree() if v == 0 and k != NODE_INPUT_TAG]
+        no_output_nodes = [k for k,v in self.abstract_graph.out_degree() if v == 0 and k != NODE_OUTPUT_TAG]
         for node in no_input_nodes: self._add_node_edges(node, 1, False, ConnectMode.IN)
         for node in no_output_nodes: self._add_node_edges(node, 1, False, ConnectMode.OUT)
         
@@ -90,7 +90,7 @@ class NeuralModule:
         mode: ConnectMode
             Should the edges be incoming or outgoing?
         """
-        nodes = set(self.graph.nodes())
+        nodes = set(self.abstract_graph.nodes())
         nodes.remove(node)
         if use_external == False or mode == ConnectMode.IN: nodes.remove(NODE_INPUT_TAG)
         if use_external == False or mode == ConnectMode.OUT: nodes.remove(NODE_OUTPUT_TAG)
@@ -104,13 +104,13 @@ class NeuralModule:
         else:
             edges = [(node, output_node) for output_node in nodes_to_connect]
 
-        self.graph.add_edges_from(edges)
+        self.abstract_graph.add_edges_from(edges)
 
     def _remove_graph_cycles(self):
         """ Removes cycles from a graph by randomly deleting edges that belong in a cycle. """
         edges_removed = 0
         while True:
-            cycles = list(nx.simple_cycles(self.graph))
+            cycles = list(nx.simple_cycles(self.abstract_graph))
             if cycles == []: break
             cycle = cycles[0]
             # Pick a random edge.
@@ -118,7 +118,7 @@ class NeuralModule:
             edge_start = cycle[random_idx]
             edge_end = cycle[random_idx + 1]
             # Remove it.
-            self.graph.remove_edge(edge_start, edge_end)
+            self.abstract_graph.remove_edge(edge_start, edge_end)
             edges_removed += 1
             print(f"Removed ({edge_start},{edge_end}) edge.")
 
@@ -163,5 +163,79 @@ class NeuralModule:
 
     def show_net(self):
         """ Draws the neural network. """
-        nx.draw_spring(self.graph, with_labels=True, labels = self.child_modules)
+        nx.draw_spring(self.abstract_graph, with_labels=True, labels = self.child_modules)
         plt.show()
+    
+    def get_graph(self):
+        """
+        Iterate through all children, getting the subgraphs and create the full graph
+        for this node.
+
+        Returns
+        -------
+        A networkx graph.
+        """
+        full_graph = nx.DiGraph()
+        # We use this index to add nodes to the full graph.
+        full_graph_idx = 0
+        # This holds the associations between each abstract node and its input
+        # output in the smaller graphs.
+        subgraph_connections_dict = {}
+        for child_idx, child in enumerate(self.child_modules):
+            # Extract this child's graph and attach it to the corresponding node
+            # of this graph.
+            if child.module_type == ModuleType.ABSTRACT_MODULE:
+                child_graph = child.get_graph()
+                # Extract nodes.
+                child_nodes = set(child_graph.nodes())
+                child_to_full_node_idx_dict = {}
+                for child_node in child_nodes:
+                    # Save the relation between the child node and its node on the
+                    # full graph.
+                    child_to_full_node_idx_dict[child_node] = full_graph_idx
+                    full_graph_idx += 1
+                    # Add nodes to full graph.
+                    full_graph.add_nodes_from(child_to_full_node_idx_dict.values())
+                
+                # Extract edges.
+                child_edges = set(child_graph.edges())
+                full_edges = []
+                for child_source,child_dest in child_edges:
+                    full_source = child_to_full_node_idx_dict[child_source]
+                    full_dest = child_to_full_node_idx_dict[child_dest]
+                    full_edges.append((full_source, full_dest))
+                # Add child edges to full graph.
+                full_graph.add_edges_from(full_edges)
+
+                # Register subgraph input and output nodes in order to connect it
+                # with the other subgraphs.
+                subgraph_connections_dict[child_idx] = {
+                    NODE_INPUT_TAG  : child_to_full_node_idx_dict[NODE_INPUT_TAG],
+                    NODE_OUTPUT_TAG : child_to_full_node_idx_dict[NODE_OUTPUT_TAG]
+                }
+
+            elif child.module_type == ModuleType.NEURAL_LAYER:
+                # Just assign a new index to this node for the full graph and register
+                # the input and output.
+                new_node_idx = full_graph_idx
+                full_graph_idx += 1
+                subgraph_connections_dict[child_idx] = {
+                    NODE_INPUT_TAG  : new_node_idx,
+                    NODE_OUTPUT_TAG : new_node_idx
+                }
+        # Now connect all the subgraphs together.
+        external_edges = []
+        for abstract_source, abstract_dest in set(self.abstract_graph.edges()):
+            full_source_dict = subgraph_connections_dict[abstract_source]
+            full_dest_dict = subgraph_connections_dict[abstract_dest]
+
+            # Find the node indices in the full graph.
+            source_output_node = full_source_dict[NODE_OUTPUT_TAG]
+            dest_input_node = full_dest_dict[NODE_INPUT_TAG]
+            external_edges.append((source_output_node, dest_input_node))
+        
+        # Add external edges.
+        full_graph.add_edges_from(external_edges)
+
+        return full_graph                   
+
