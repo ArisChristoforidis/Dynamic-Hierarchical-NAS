@@ -1,8 +1,7 @@
 from evaluation import Evaluator
 from nord.neural_nets.benchmark_evaluators import BenchmarkEvaluator
 import random as rnd
-
-from matplotlib.pyplot import cool
+import itertools as it
 from enums import ConnectMode, ModuleType
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -37,7 +36,7 @@ class NeuralModule:
         available_layers = self.evaluator.get_available_layers()
         self.layer = rnd.choice(available_layers)
 
-    def _init_graph(self):
+    def _init_abstract_graph(self):
         """ Create a random graph for this module. """
         self.abstract_graph = nx.DiGraph()
 
@@ -68,9 +67,6 @@ class NeuralModule:
         for node in no_input_nodes: self._add_node_edges(node, 1, False, ConnectMode.IN)
         for node in no_output_nodes: self._add_node_edges(node, 1, False, ConnectMode.OUT)
         
-        # Remove cycles which may cause problems with NORD.
-        self._remove_graph_cycles()
-
     def _add_node_edges(self, node: int, count: int, use_external: bool, mode: ConnectMode):
         """
         Adds a number of edges between the given node and a random node.
@@ -106,6 +102,7 @@ class NeuralModule:
 
         self.abstract_graph.add_edges_from(edges)
 
+    # NOTE: Not used.
     def _remove_graph_cycles(self):
         """ Removes cycles from a graph by randomly deleting edges that belong in a cycle. """
         edges_removed = 0
@@ -123,6 +120,17 @@ class NeuralModule:
             print(f"Removed ({edge_start},{edge_end}) edge.")
 
         print(f"Removed {edges_removed} edge(s).")
+
+    def _abstract_graph_has_cycles(self):
+        """ 
+        Checks if the abstract graph has (simple) cycles. 
+        
+        Returns
+        -------
+        has_cycles: bool
+            Whether or not the abstract graph has (simple) cycles. 
+        """
+        return len(list(nx.simple_cycles(self.abstract_graph)))
 
     def mutate_node(self):
         """
@@ -154,8 +162,12 @@ class NeuralModule:
         self.module_type = new_type
         if new_type == ModuleType.ABSTRACT_MODULE:
             self._create_children()
-            self._init_graph()
-            #self.show_net()
+            # Try to create the abstract graph, until a random topology with no 
+            # cycles is made.
+            while True:
+                self._init_abstract_graph()
+                if self._abstract_graph_has_cycles() == False: break
+            
     
     def mutate(self):
         """ Perform mutation. """
@@ -176,16 +188,30 @@ class NeuralModule:
         A networkx graph.
         """
         full_graph = nx.DiGraph()
+        layer_names = {}
         # We use this index to add nodes to the full graph.
         full_graph_idx = 0
         # This holds the associations between each abstract node and its input
         # output in the smaller graphs.
         subgraph_connections_dict = {}
-        for child_idx, child in enumerate(self.child_modules):
+        # Add the input and output nodes manually.
+        subgraph_connections_dict[NODE_INPUT_TAG] = {NODE_INPUT_TAG : -1, NODE_OUTPUT_TAG : full_graph_idx}
+        input_idx = full_graph_idx
+        full_graph.add_node(input_idx)
+        layer_names[full_graph_idx] = NODE_INPUT_TAG
+        full_graph_idx += 1
+        
+        subgraph_connections_dict[NODE_OUTPUT_TAG] = {NODE_INPUT_TAG : full_graph_idx, NODE_OUTPUT_TAG : -1}
+        output_idx = full_graph_idx
+        full_graph.add_node(full_graph_idx)
+        layer_names[full_graph_idx] = NODE_OUTPUT_TAG
+        full_graph_idx += 1
+        
+        for child_idx, child in self.child_modules.items():
             # Extract this child's graph and attach it to the corresponding node
             # of this graph.
             if child.module_type == ModuleType.ABSTRACT_MODULE:
-                child_graph = child.get_graph()
+                child_graph, child_layer_names, child_input_idx, child_output_idx = child.get_graph()
                 # Extract nodes.
                 child_nodes = set(child_graph.nodes())
                 child_to_full_node_idx_dict = {}
@@ -193,6 +219,8 @@ class NeuralModule:
                     # Save the relation between the child node and its node on the
                     # full graph.
                     child_to_full_node_idx_dict[child_node] = full_graph_idx
+                    # Also get the layer name for each node.
+                    layer_names[full_graph_idx] = child_layer_names[child_node]
                     full_graph_idx += 1
                     # Add nodes to full graph.
                     full_graph.add_nodes_from(child_to_full_node_idx_dict.values())
@@ -210,19 +238,23 @@ class NeuralModule:
                 # Register subgraph input and output nodes in order to connect it
                 # with the other subgraphs.
                 subgraph_connections_dict[child_idx] = {
-                    NODE_INPUT_TAG  : child_to_full_node_idx_dict[NODE_INPUT_TAG],
-                    NODE_OUTPUT_TAG : child_to_full_node_idx_dict[NODE_OUTPUT_TAG]
+                    NODE_INPUT_TAG  : child_to_full_node_idx_dict[child_input_idx],
+                    NODE_OUTPUT_TAG : child_to_full_node_idx_dict[child_output_idx]
                 }
+                child_layer_names[child_to_full_node_idx_dict[child_input_idx]] = NODE_INPUT_TAG
+                child_layer_names[child_to_full_node_idx_dict[child_output_idx]] = NODE_OUTPUT_TAG
 
             elif child.module_type == ModuleType.NEURAL_LAYER:
                 # Just assign a new index to this node for the full graph and register
                 # the input and output.
                 new_node_idx = full_graph_idx
+                layer_names[full_graph_idx] = child.layer
                 full_graph_idx += 1
                 subgraph_connections_dict[child_idx] = {
                     NODE_INPUT_TAG  : new_node_idx,
                     NODE_OUTPUT_TAG : new_node_idx
                 }
+
         # Now connect all the subgraphs together.
         external_edges = []
         for abstract_source, abstract_dest in set(self.abstract_graph.edges()):
@@ -234,8 +266,12 @@ class NeuralModule:
             dest_input_node = full_dest_dict[NODE_INPUT_TAG]
             external_edges.append((source_output_node, dest_input_node))
         
-        # Add external edges.
+        # Use the external edges to connect internal nodes of different subgraphs.
         full_graph.add_edges_from(external_edges)
+     
+        if self.depth == 1: 
+            nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
+            plt.show()
 
-        return full_graph                   
+        return full_graph, layer_names, input_idx, output_idx
 

@@ -15,11 +15,9 @@ def main():
     evaluator = Evaluator()
     n = NeuralModule(1,evaluator)
     # Do some example mutations.
-    n.mutate()
-    n.mutate()
-    n.mutate()
-    n.mutate()
-    
+    for _ in range(5):
+        n.get_graph()
+        n.mutate()
     print(f"Size: {communicator._get_size()}")
     return
 
