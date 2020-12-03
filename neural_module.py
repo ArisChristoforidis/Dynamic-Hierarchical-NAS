@@ -257,6 +257,7 @@ class NeuralModule:
 
         # Now connect all the subgraphs together.
         external_edges = []
+        delete_keys = set()
         for abstract_source, abstract_dest in set(self.abstract_graph.edges()):
             full_source_dict = subgraph_connections_dict[abstract_source]
             full_dest_dict = subgraph_connections_dict[abstract_dest]
@@ -264,12 +265,39 @@ class NeuralModule:
             # Find the node indices in the full graph.
             source_output_node = full_source_dict[NODE_OUTPUT_TAG]
             dest_input_node = full_dest_dict[NODE_INPUT_TAG]
-            external_edges.append((source_output_node, dest_input_node))
+
+            output_nodes = [source_output_node]
+            input_nodes = [dest_input_node]
+
+            # If the output node is part of a complex graph, get the in edges
+            # and remove the artificial node by connecting the edges that lead
+            # to this node with the dest_input_node.
+            if NODE_OUTPUT_TAG in layer_names[source_output_node]:
+                in_edges = full_graph.in_edges(source_output_node)
+                output_nodes = [start for start,_ in in_edges]
+                # Mark node for deletion.
+                delete_keys.add(source_output_node)
+            
+            # If the input node is part of a complex graph, get the out edges
+            # and remove the artificial node by connecting the edges that start
+            # from this node with the source_output_node.
+            if NODE_INPUT_TAG in layer_names[dest_input_node]:
+                out_edges = full_graph.out_edges(dest_input_node)
+                input_nodes = [end for _,end in out_edges]
+                # Mark node for deletion.
+                delete_keys.add(dest_input_node)
+
+            # Create the proper connections.
+            external_connections = list(it.product(output_nodes,input_nodes))
+            external_edges.extend(external_connections)
         
         # Use the external edges to connect internal nodes of different subgraphs.
         full_graph.add_edges_from(external_edges)
-     
-        if self.depth == 1: 
+        for key in set(delete_keys): 
+            full_graph.remove_node(key)
+            layer_names.pop(key)
+
+        if self.depth == 1:
             nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
             plt.show()
 
