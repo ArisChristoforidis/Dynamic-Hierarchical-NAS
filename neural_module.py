@@ -325,8 +325,8 @@ class NeuralModule:
         # Get full graph data.
         full_graph, layer_types, input_idx, output_idx = self.get_graph()
         # Add input/output layers.
-        descriptor.add_layer_sequential('input', {}, str(input_idx))
-        descriptor.add_layer_sequential('output', {}, str(output_idx))
+        descriptor.add_layer('input', {}, str(input_idx))
+        descriptor.add_layer('output', {}, str(output_idx))
 
         # Create layers by iterating through the nodes.
         nodes = full_graph.nodes()
