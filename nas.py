@@ -11,13 +11,14 @@ def main():
     communicator = Communicator()
     
     # Switch to this to use nasbench.
-    #evaluator = NasBenchEvaluator()
-    evaluator = Evaluator()
+    evaluator = NasBenchEvaluator()
+    #evaluator = Evaluator()
     n = NeuralModule(1,evaluator)
     # Do some example mutations.
     for _ in range(5):
-        n.get_graph()
         n.mutate()
+        d = n.to_descriptor()
+        print(d)
     print(f"Size: {communicator._get_size()}")
     return
 

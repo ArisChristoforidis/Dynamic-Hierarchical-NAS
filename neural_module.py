@@ -1,10 +1,10 @@
-from evaluation import Evaluator
-from nord.neural_nets.benchmark_evaluators import BenchmarkEvaluator
 import random as rnd
 import itertools as it
-from enums import ConnectMode, ModuleType
 import networkx as nx
 import matplotlib.pyplot as plt
+from evaluation import Evaluator
+from enums import ConnectMode, ModuleType
+from nord.neural_nets import NeuralDescriptor
 from config import NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
 
 class NeuralModule:
@@ -24,7 +24,6 @@ class NeuralModule:
         self._assign_layer()
 
         if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
-
 
     def _create_children(self):
         """ Randomly assign neural layers to the network graph. """
@@ -167,8 +166,7 @@ class NeuralModule:
             while True:
                 self._init_abstract_graph()
                 if self._abstract_graph_has_cycles() == False: break
-            
-    
+                
     def mutate(self):
         """ Perform mutation. """
         self.mutate_node()
@@ -185,7 +183,17 @@ class NeuralModule:
 
         Returns
         -------
-        A networkx graph.
+        full_graph: nx.Digraph
+            A networkx directed graph.
+
+        layer_names: dict(int->str)
+            A dictionary containing the layer names(types).
+        
+        input_idx: int
+            The index of the input node for the graph.
+
+        output_idx: int
+            The index of the output node for the graph.        
         """
         full_graph = nx.DiGraph()
         layer_names = {}
@@ -303,3 +311,35 @@ class NeuralModule:
 
         return full_graph, layer_names, input_idx, output_idx
 
+    def to_descriptor(self):
+        """
+        Creates the descriptor object that represents the network module.
+
+        Returns
+        -------
+        descriptor: NeuralDescriptor
+            A descriptor object.
+        """
+        # Create descriptor.
+        descriptor = NeuralDescriptor()
+        # Get full graph data.
+        full_graph, layer_types, input_idx, output_idx = self.get_graph()
+        # Add input/output layers.
+        descriptor.add_layer_sequential('input', {}, str(input_idx))
+        descriptor.add_layer_sequential('output', {}, str(output_idx))
+
+        # Create layers by iterating through the nodes.
+        nodes = full_graph.nodes()
+        for node in nodes:
+            # Skip input/output node, we already added them.
+            if node == input_idx or node == output_idx: continue
+            # Get layer type and add it to the descriptor.
+            layer_type = layer_types[node]
+            descriptor.add_layer(layer_type, {}, str(node))
+
+        # Connect layers by iterating through the graph edges.
+        edges = full_graph.edges()
+        for source,dest in edges:
+            descriptor.connect_layers(str(source), str(dest))
+
+        return descriptor
