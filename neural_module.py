@@ -120,33 +120,91 @@ class NeuralModule:
 
         print(f"Removed {edges_removed} edge(s).")
 
-    def _abstract_graph_has_cycles(self):
+    def _graph_has_cycles(self, graph):
         """ 
-        Checks if the abstract graph has (simple) cycles. 
+        Checks if a graph has (simple) cycles. 
         
+        Parameters
+        ----------
+        graph: nx.Digraph
+            A networkx graph.
+
         Returns
         -------
         has_cycles: bool
             Whether or not the abstract graph has (simple) cycles. 
         """
-        return len(list(nx.simple_cycles(self.abstract_graph)))
+        return len(list(nx.simple_cycles(graph))) > 0
 
     def mutate_node(self):
         """
         Performs mutation by finding a neural node in the graph and converting
         it to an abstract module.
         """
-        # Change module type so that children are generated.
-        # self.change_module_type(ModuleType.ABSTRACT_MODULE)
-
         selected_node = rnd.choice(self.child_modules)
         if selected_node.module_type == ModuleType.ABSTRACT_MODULE:
             selected_node.mutate_node()
         elif selected_node.module_type == ModuleType.NEURAL_LAYER:
             selected_node.change_module_type(ModuleType.ABSTRACT_MODULE)
 
-    def _mutate_connection(self):
-        return NotImplementedError
+    def mutate_connection(self):
+        """
+        Performs a mutation by finding adding an edge to an abstract graph of a
+        random depth in the module.
+        
+        Returns
+        -------
+        success: bool
+            Whether the operation was successfull or not.
+        """
+        # Get all nodes in the abstract graph that are abstract modules.
+        abstract_nodes = [node for node in self.child_modules.values() if node.module_type == ModuleType.ABSTRACT_MODULE]
+        can_add_edge_to_self = True
+        while True:
+            visit_child = rnd.random() < 0.5
+            # Check that the randomness decided we will be visiting a child(alternatively, 
+            # we can't add an an edge to this layer) & there are children to visit.
+            if (visit_child == True or can_add_edge_to_self == False) and len(abstract_nodes) > 0:
+                # Select a child code.
+                selected_node = rnd.choice(abstract_nodes)
+                child_success = selected_node.mutate_connection()
+                # If we could not add an edge to this part of the graph, remove 
+                # it as a choice.
+                if child_success == False:
+                    abstract_nodes.remove(selected_node)
+                else:
+                    # Edge connection successful.
+                    return True                
+            elif can_add_edge_to_self == True:
+                # Add the edge on this module's abstract graph.
+                # Get all possible edges.
+                possible_edges = list(it.product(self.abstract_graph.nodes,repeat=2))
+                # Remove all existing edges.
+                possible_edges = [edge for edge in possible_edges if edge not in self.abstract_graph.edges()]
+                # Remove all the self loops.
+                possible_edges = [(source, dest) for source, dest in possible_edges if source != dest]
+                # Remove all edges that start from the output or end in the input.
+                possible_edges = [(source, dest) for source, dest in possible_edges if source != NODE_OUTPUT_TAG and dest != NODE_INPUT_TAG]
+                # TODO: Decide whether an (INPUT, OUTPUT) edge is desirable.
+                # If there are no possible edges to add to the graph, quit.
+                if possible_edges == []: can_add_edge_to_self = False
+                while len(possible_edges) > 0:
+                    # Get a random edge and add it to the abstract graph,testing it for cycles.
+                    source,dest = rnd.choice(possible_edges)
+                    temp_graph = self.abstract_graph.copy()
+                    temp_graph.add_edge(source, dest)
+                    # If this has cycles, remove it from the possible edges list.
+                    if self._graph_has_cycles(temp_graph) == True:
+                        possible_edges.remove((source,dest))
+                    else:
+                        # Set the abstract graph with the new connection.
+                        self.abstract_graph = temp_graph
+                        return True
+                # We did not manage to add an edge.
+                can_add_edge_to_self = False
+            else:
+                # An edge cannot be added at any point in the graph.
+                return False
     
     def change_module_type(self, new_type: ModuleType):
         """
@@ -165,11 +223,12 @@ class NeuralModule:
             # cycles is made.
             while True:
                 self._init_abstract_graph()
-                if self._abstract_graph_has_cycles() == False: break
+                if self._graph_has_cycles(self.abstract_graph) == False: break
                 
     def mutate(self):
         """ Perform mutation. """
         self.mutate_node()
+        _ = self.mutate_connection()
 
     def show_net(self):
         """ Draws the neural network. """
