@@ -53,9 +53,12 @@ class NasBenchEvaluator(Evaluator):
     def __init__(self):
         self.evaluator = BenchmarkEvaluator(False)
 
-    def evaluate(self,descriptor):
-        params, acc, time =self.evaluator.descriptor_evaluate(descriptor)
-        return params, acc, time
+    def evaluate(self, neural_module):
+        """
+        """
+        descriptor = neural_module.to_descriptor()
+        acc, time = self.evaluator.descriptor_evaluate(descriptor)
+        return acc, time
 
     def get_available_layers(self):
         return self.evaluator.get_available_ops()

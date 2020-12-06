@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from evaluation import Evaluator
 from enums import ConnectMode, ModuleType
 from nord.neural_nets import NeuralDescriptor
-from config import NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
+from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
 
 class NeuralModule:
 
@@ -227,8 +227,16 @@ class NeuralModule:
                 
     def mutate(self):
         """ Perform mutation. """
-        self.mutate_node()
-        _ = self.mutate_connection()
+        
+        full_graph,_,_,_ = self.get_graph()
+        node_count = len(full_graph.nodes())
+        edge_count = len(full_graph.edges())
+        
+        if node_count < MAX_NODES:
+            self.mutate_node()
+        
+        if edge_count < MAX_EDGES:
+            _ = self.mutate_connection()
 
     def show_net(self):
         """ Draws the neural network. """
@@ -261,17 +269,11 @@ class NeuralModule:
         # This holds the associations between each abstract node and its input
         # output in the smaller graphs.
         subgraph_connections_dict = {}
-        # Add the input and output nodes manually.
+        # Add the input nodes manually.
         subgraph_connections_dict[NODE_INPUT_TAG] = {NODE_INPUT_TAG : -1, NODE_OUTPUT_TAG : full_graph_idx}
         input_idx = full_graph_idx
         full_graph.add_node(input_idx)
         layer_names[full_graph_idx] = NODE_INPUT_TAG
-        full_graph_idx += 1
-        
-        subgraph_connections_dict[NODE_OUTPUT_TAG] = {NODE_INPUT_TAG : full_graph_idx, NODE_OUTPUT_TAG : -1}
-        output_idx = full_graph_idx
-        full_graph.add_node(full_graph_idx)
-        layer_names[full_graph_idx] = NODE_OUTPUT_TAG
         full_graph_idx += 1
         
         for child_idx, child in self.child_modules.items():
@@ -322,6 +324,13 @@ class NeuralModule:
                     NODE_OUTPUT_TAG : new_node_idx
                 }
 
+        # Add the output nodes manually.
+        subgraph_connections_dict[NODE_OUTPUT_TAG] = {NODE_INPUT_TAG : full_graph_idx, NODE_OUTPUT_TAG : -1}
+        output_idx = full_graph_idx
+        full_graph.add_node(full_graph_idx)
+        layer_names[full_graph_idx] = NODE_OUTPUT_TAG
+        full_graph_idx += 1
+
         # Now connect all the subgraphs together.
         external_edges = []
         delete_keys = set()
@@ -364,9 +373,11 @@ class NeuralModule:
             full_graph.remove_node(key)
             layer_names.pop(key)
 
+        """
         if self.depth == 1:
             nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
             plt.show()
+        """
 
         return full_graph, layer_names, input_idx, output_idx
 
