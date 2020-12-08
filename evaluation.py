@@ -12,19 +12,19 @@ class Evaluator:
 
     def evaluate(self, genome):
         """
-        Evaluates a genome.
+        Evaluates a network represented by a neural module.
 
         Parameters
-        ----------
-        genome: genome
-            A genome object.
+        ---------
+        neural_module: NeuralModule
+            A neural module.
 
         Returns
         -------
-        fitness: float
-            The network fitness.
+        acc: float
+            The network accuracy.
         
-        total_time: float
+        time: float
             The evaluation time.
         """
         dim = INPUT_SHAPE[DATASET]
@@ -55,6 +55,21 @@ class NasBenchEvaluator(Evaluator):
 
     def evaluate(self, neural_module):
         """
+        Evaluates a network represented by a neural module on the nasbench
+        dataset.
+
+        Parameters
+        ---------
+        neural_module: NeuralModule
+            A neural module.
+
+        Returns
+        -------
+        acc: float
+            The netowrk accuracy.
+        
+        time: float
+            The evaluation time.
         """
         descriptor = neural_module.to_descriptor()
         acc, time = self.evaluator.descriptor_evaluate(descriptor)

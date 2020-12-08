@@ -9,9 +9,10 @@ from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVAL
 
 class NeuralModule:
 
-    def __init__(self, depth: int, evaluator: Evaluator):
+    def __init__(self, parent_module, evaluator: Evaluator):
         # Constructor variables.
-        self.depth = depth
+        self.depth = 1 if parent_module == None else parent_module.depth + 1
+        self.parent_module = parent_module
         self.evaluator = evaluator
         self.fitness = UNEVALUATED_FITNESS
         self.module_type = ModuleType.NEURAL_LAYER
@@ -27,7 +28,7 @@ class NeuralModule:
 
     def _create_children(self):
         """ Randomly assign neural layers to the network graph. """
-        self.child_modules = {child_idx : NeuralModule(self.depth + 1, self.evaluator) for child_idx in range(self.child_count)}
+        self.child_modules = {child_idx : NeuralModule(self, self.evaluator) for child_idx in range(self.child_count)}
         return
 
     def _assign_layer(self):
@@ -101,26 +102,7 @@ class NeuralModule:
 
         self.abstract_graph.add_edges_from(edges)
 
-    # NOTE: Not used.
-    def _remove_graph_cycles(self):
-        """ Removes cycles from a graph by randomly deleting edges that belong in a cycle. """
-        edges_removed = 0
-        while True:
-            cycles = list(nx.simple_cycles(self.abstract_graph))
-            if cycles == []: break
-            cycle = cycles[0]
-            # Pick a random edge.
-            random_idx = rnd.randint(0, len(cycle) - 2)
-            edge_start = cycle[random_idx]
-            edge_end = cycle[random_idx + 1]
-            # Remove it.
-            self.abstract_graph.remove_edge(edge_start, edge_end)
-            edges_removed += 1
-            print(f"Removed ({edge_start},{edge_end}) edge.")
-
-        print(f"Removed {edges_removed} edge(s).")
-
-    def _graph_has_cycles(self, graph):
+    def _graph_has_cycles(self, graph: nx.DiGraph):
         """ 
         Checks if a graph has (simple) cycles. 
         
@@ -140,12 +122,19 @@ class NeuralModule:
         """
         Performs mutation by finding a neural node in the graph and converting
         it to an abstract module.
+
+        Returns
+        -------
+        success: bool
+            Whether the operation was successfull or not.            
         """
         selected_node = rnd.choice(self.child_modules)
         if selected_node.module_type == ModuleType.ABSTRACT_MODULE:
             selected_node.mutate_node()
         elif selected_node.module_type == ModuleType.NEURAL_LAYER:
             selected_node.change_module_type(ModuleType.ABSTRACT_MODULE)
+
+        return True
 
     def mutate_connection(self):
         """
@@ -232,11 +221,18 @@ class NeuralModule:
         node_count = len(full_graph.nodes())
         edge_count = len(full_graph.edges())
         
+        node_mutated = False
+        # TODO: These should be checks just for probability.
         if node_count < MAX_NODES:
-            self.mutate_node()
+            node_mutated = self.mutate_node()
         
+        edge_mutated = False
         if edge_count < MAX_EDGES:
-            _ = self.mutate_connection()
+            edge_mutated = self.mutate_connection()
+        
+        # Update the fitness.
+        if node_mutated or edge_mutated:
+            self.on_mutation_occured()
 
     def show_net(self):
         """ Draws the neural network. """
@@ -413,3 +409,40 @@ class NeuralModule:
             descriptor.connect_layers(str(source), str(dest))
 
         return descriptor
+
+    def set_fitness(self, fitness: float):
+        """
+        Sets the fitness for this module(and all its children).
+
+        Parameters
+        ----------
+        fitness: float
+            The fitness value. If this is the first layer, pass the network accuracy.
+        """
+
+        # For now the network fitness will be the accuracy divided by the number of
+        # total nodes in the full graph of its children.
+        if self.module_type == ModuleType.ABSTRACT_MODULE:
+            # Set self fitness.
+            full_graph, _, _, _ = self.get_graph()
+            total_nodes = len(full_graph.nodes())
+            self.fitness = fitness / total_nodes
+            # Divide the fitness score equally among the abstract children.
+            child_fitness = fitness / len(self.child_modules)
+            child_modules = self.child_modules.values()
+            for child_module in child_modules:
+                child_module.set_fitness(child_fitness)
+        elif self.module_type == ModuleType.NEURAL_LAYER:
+            # When the module is a simple neural layer, the whole fitness is
+            # assigned to it.
+            self.fitness = fitness
+     
+        
+    def on_mutation_occured(self):
+        """
+        When a mutation occurs, we need to reset the fitness of the module and
+        all its parent nodes.
+        """
+        self.fitness = UNEVALUATED_FITNESS
+        if self.depth > 1:
+            self.parent_module.on_child_mutated()
