@@ -1,36 +1,87 @@
+from module_properties import ModuleProperties
 import random as rnd
 import itertools as it
 import networkx as nx
 import matplotlib.pyplot as plt
-from evaluation import Evaluator
 from enums import ConnectMode, ModuleType
 from nord.neural_nets import NeuralDescriptor
 from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
 
 class NeuralModule:
 
-    def __init__(self, parent_module, evaluator: Evaluator):
-        # Constructor variables.
+    def __init__(self, parent_module, evaluator, module_properties = None):
+        # Network-specific properties.
         self.depth = 1 if parent_module == None else parent_module.depth + 1
         self.parent_module = parent_module
-        self.evaluator = evaluator
         self.fitness = UNEVALUATED_FITNESS
-        self.module_type = ModuleType.NEURAL_LAYER
-        
-        # Randomize seed.
         self.random_seed = rnd.randint(0,100)
-        self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE)
+        
+        self.evaluator = evaluator
 
-        # Assign layer to module.
-        self._assign_layer()
+        # Module properties.
+        if module_properties == None: 
+            # TODO: Get a random module_properties object.
+            # module_properties = get_random_module_properties_object()
+            pass
+
+        self.layer = module_properties.layer
+        self.module_type = module_properties.module_type
+        self.abstract_graph = module_properties.abstract_graph
+        if self.module_type == ModuleType.NEURAL_LAYER:
+            # Set the number of (future) children.
+            self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE)
+        elif self.module_type == ModuleType.ABSTRACT_MODULE:
+            # Generate children from properties files.
+            self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
+            pass
+
+        """
+        if module_properties == None:
+            # Create a random module.
+            self.module_type = ModuleType.NEURAL_LAYER    ok
+            self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE) ok
+            # Assign layer to module.
+            self._assign_layer() not used
+        else:
+            # Use the module given to assign properties.
+            self.module_type = module_properties.module_type
+            self.abstract_graph = module_properties.abstract_graph
+            self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
+            self.layer = module_properties.layer
+        """
 
         if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
 
-    def _create_children(self):
-        """ Randomly assign neural layers to the network graph. """
-        self.child_modules = {child_idx : NeuralModule(self, self.evaluator) for child_idx in range(self.child_count)}
-        return
+    # NOTE: Will probably be removed.
+    def _generate_children_randomly(self):
+        """
+        Randomly assign neural layers to the network graph. 
 
+        Returns
+        -------
+        child_modules: dict(int->NeuralModule)
+            The child_modules dict.
+        """
+        return {child_idx : NeuralModule(self, self.evaluator) for child_idx in range(self.child_count)}
+
+    def _generate_children_from_properties(self, child_module_properties):
+        """
+        Assigns neural layers to the network graph based on the child module 
+        properties given in the constructor.
+
+        Parameters
+        ----------
+        child_module_properties: list(ModuleProperties)
+            A list of ModuleProperties of the children of this node.
+            
+        Returns
+        -------
+        child_modules: dict(int->NeuralModule)
+            The child_modules dict.
+        """
+        return {child_idx: NeuralModule(self, self.evaluator, properties) for child_idx, properties in enumerate(child_module_properties)}
+        
+    # NOTE: This might be repurposed to select a random module property object.
     def _assign_layer(self):
         """ Assign a layer to this module. """
         available_layers = self.evaluator.get_available_layers()
@@ -197,7 +248,8 @@ class NeuralModule:
     
     def change_module_type(self, new_type: ModuleType):
         """
-        Changes the module's type.
+        Changes the module's type. Setting the type as ModuleType.ABSTRACT_MODULE
+        creates new children.
 
         Parameters
         ----------
@@ -207,7 +259,7 @@ class NeuralModule:
         if (self.module_type == new_type): return
         self.module_type = new_type
         if new_type == ModuleType.ABSTRACT_MODULE:
-            self._create_children()
+            self._generate_children_randomly()
             # Try to create the abstract graph, until a random topology with no 
             # cycles is made.
             while True:
@@ -446,3 +498,37 @@ class NeuralModule:
         self.fitness = UNEVALUATED_FITNESS
         if self.depth > 1:
             self.parent_module.on_child_mutated()
+
+    def get_module_properties(self):
+        """
+        Extracts the module properties for this neural module(And its children).
+
+        Returns
+        -------
+        module_properties: ModuleProperties
+            A module_properties object.
+        """
+        # Get the child module properties.
+        child_module_properties = [child.get_module_properties() for child in self.child_modules]
+        # Create and return object.
+        module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
+        return module_properties
+
+    # NOTE: Not used.
+    @classmethod
+    def from_module_properties(parent_module, module_properties):
+        """
+        Creates a neural module from a module properties object.
+        
+        Parameters
+        ----------
+        module_properties: ModuleProperties
+            A module properties object.
+
+        Returns
+        -------
+        neural_module: NeuralModule
+            A neural_module.
+        """
+
+

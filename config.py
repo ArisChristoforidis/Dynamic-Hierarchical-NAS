@@ -1,6 +1,7 @@
 # Author: Aris Christoforidis
 
 # EVOLUTION
+MAX_NOTABLE_MODULES = 100
 LAYERS_LIST = ['CONV_1.H', 'CONV_2.H', 'CONV_3.H', 'POOL_2.A', 'POOL_3.A', 'POOL_5.A',
                'CONV_1.N', 'CONV_2.N', 'CONV_3.N', 'POOL_2.M', 'POOL_3.M', 'POOL_5.M']
 
