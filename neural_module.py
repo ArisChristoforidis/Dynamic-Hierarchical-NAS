@@ -1,3 +1,4 @@
+from module_manager import ModuleManager
 from module_properties import ModuleProperties
 import random as rnd
 import itertools as it
@@ -9,19 +10,20 @@ from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVAL
 
 class NeuralModule:
 
-    def __init__(self, parent_module, evaluator, module_properties = None):
+    def __init__(self, parent_module, module_manager ,module_properties = None):
         # Network-specific properties.
         self.depth = 1 if parent_module == None else parent_module.depth + 1
         self.parent_module = parent_module
         self.fitness = UNEVALUATED_FITNESS
         self.random_seed = rnd.randint(0,100)
         
-        self.evaluator = evaluator
+        self.module_manager = module_manager
 
         # Module properties.
         if module_properties == None: 
             # TODO: Get a random module_properties object.
             # module_properties = get_random_module_properties_object()
+            module_properties = module_manager.get_random_notable_modules()
             pass
 
         self.layer = module_properties.layer
@@ -34,7 +36,8 @@ class NeuralModule:
             # Generate children from properties files.
             self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
             pass
-
+        
+        # TODO: Remove.
         """
         if module_properties == None:
             # Create a random module.
@@ -52,7 +55,6 @@ class NeuralModule:
 
         if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
 
-    # NOTE: Will probably be removed.
     def _generate_children_randomly(self):
         """
         Randomly assign neural layers to the network graph. 
@@ -62,7 +64,7 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        return {child_idx : NeuralModule(self, self.evaluator) for child_idx in range(self.child_count)}
+        return {child_idx : NeuralModule(self, self.module_manager) for child_idx in range(self.child_count)}
 
     def _generate_children_from_properties(self, child_module_properties):
         """
@@ -79,14 +81,8 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        return {child_idx: NeuralModule(self, self.evaluator, properties) for child_idx, properties in enumerate(child_module_properties)}
+        return {child_idx: NeuralModule(self, self.module_manager, properties) for child_idx, properties in enumerate(child_module_properties)}
         
-    # NOTE: This might be repurposed to select a random module property object.
-    def _assign_layer(self):
-        """ Assign a layer to this module. """
-        available_layers = self.evaluator.get_available_layers()
-        self.layer = rnd.choice(available_layers)
-
     def _init_abstract_graph(self):
         """ Create a random graph for this module. """
         self.abstract_graph = nx.DiGraph()
@@ -513,22 +509,4 @@ class NeuralModule:
         # Create and return object.
         module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
         return module_properties
-
-    # NOTE: Not used.
-    @classmethod
-    def from_module_properties(parent_module, module_properties):
-        """
-        Creates a neural module from a module properties object.
-        
-        Parameters
-        ----------
-        module_properties: ModuleProperties
-            A module properties object.
-
-        Returns
-        -------
-        neural_module: NeuralModule
-            A neural_module.
-        """
-
 
