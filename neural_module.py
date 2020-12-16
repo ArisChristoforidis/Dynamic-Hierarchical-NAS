@@ -20,12 +20,15 @@ class NeuralModule:
         self.module_manager = module_manager
 
         # Module properties.
-        if module_properties == None: 
+        if module_properties == None:
             # TODO: Get a random module_properties object.
-            # module_properties = get_random_module_properties_object()
             module_properties = module_manager.get_random_notable_modules()
             pass
 
+        # Set the module properties for this module. If there is no mutation, we
+        # don't need to recalculate this object.
+        self.module_properties = module_properties
+        
         self.layer = module_properties.layer
         self.module_type = module_properties.module_type
         self.abstract_graph = module_properties.abstract_graph
@@ -484,18 +487,22 @@ class NeuralModule:
             # When the module is a simple neural layer, the whole fitness is
             # assigned to it.
             self.fitness = fitness
-     
         
+        # Convert the neural module to a module_properties object and record its performance.
+        module_properties_object = self.to_module_properties()
+        self.module_manager.record_module_properties(module_properties_object)
+     
     def on_mutation_occured(self):
         """
         When a mutation occurs, we need to reset the fitness of the module and
         all its parent nodes.
         """
         self.fitness = UNEVALUATED_FITNESS
+        self.module_properties = None
         if self.depth > 1:
             self.parent_module.on_child_mutated()
 
-    def get_module_properties(self):
+    def to_module_properties(self):
         """
         Extracts the module properties for this neural module(And its children).
 
@@ -504,9 +511,13 @@ class NeuralModule:
         module_properties: ModuleProperties
             A module_properties object.
         """
-        # Get the child module properties.
-        child_module_properties = [child.get_module_properties() for child in self.child_modules]
-        # Create and return object.
-        module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
-        return module_properties
+        # This is none if a mutation occured.
+        if self.module_properties == None:
+            # Get the child module properties.
+            child_module_properties = [child.to_module_properties() for child in self.child_modules]
+            # Create and return object.
+            self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
+        
+        return self.module_properties
+
 

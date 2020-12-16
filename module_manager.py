@@ -59,4 +59,14 @@ class ModuleManager:
         
         notable_modules = rnd.choices(population=candidates, weights=w,k=count)
         return notable_modules
+    
+    def record_module_properties(self, neural_module_properties):
+        """
+        Receive a neural module and evaluate whether it should be added to the
+        notable_modules list.
+
+        Parameters
+        ----------
+
+        """
         
