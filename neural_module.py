@@ -489,7 +489,7 @@ class NeuralModule:
             self.fitness = fitness
         
         # Convert the neural module to a module_properties object and record its performance.
-        module_properties_object = self.to_module_properties()
+        module_properties_object = self.get_module_properties()
         self.module_manager.record_module_properties(module_properties_object)
      
     def on_mutation_occured(self):
@@ -502,7 +502,7 @@ class NeuralModule:
         if self.depth > 1:
             self.parent_module.on_child_mutated()
 
-    def to_module_properties(self):
+    def get_module_properties(self):
         """
         Extracts the module properties for this neural module(And its children).
 

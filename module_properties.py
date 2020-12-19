@@ -1,5 +1,7 @@
 # Author: Aris Christoforidis
 
+from networkx.generators.random_graphs import fast_gnp_random_graph
+from config import TEMP_MODULE_TTL
 from networkx.algorithms.graph_hashing import weisfeiler_lehman_graph_hash
 
 class ModuleProperties:
@@ -9,6 +11,7 @@ class ModuleProperties:
         self.layer = layer
         self.abstract_graph = abstract_graph
         self.child_module_properties = child_module_properties
+        self.cached_hash = None
 
     def __hash__(self):
         """
@@ -19,11 +22,61 @@ class ModuleProperties:
         hash: int
             The integer hash of the object.
         """
-        # Hash the abstract graph.
-        abstract_graph_hash = weisfeiler_lehman_graph_hash(self.abstract_graph)
-        # Get the hashes of the children.
-        child_module_hashes = [hash(child_properties) for child_properties in self.child_module_properties]            
-        # Create a list with the attributes of self and children and convert it to a tuple to make it hashable.
-        attribute_container = [self.module_type, self.layer, abstract_graph_hash].extend(child_module_hashes)
-        attribute_container = tuple(attribute_container)
-        return hash(attribute_container)
+        if self.cached_hash == None:
+            # Hash the abstract graph.
+            abstract_graph_hash = weisfeiler_lehman_graph_hash(self.abstract_graph)
+            # Get the hashes of the children.
+            child_module_hashes = [hash(child_properties) for child_properties in self.child_module_properties]            
+            # Create a list with the attributes of self and children and convert it to a tuple to make it hashable.
+            attribute_container = [self.module_type, self.layer, abstract_graph_hash].extend(child_module_hashes)
+            attribute_container = tuple(attribute_container)
+            # Get the hash and cache it.
+            self.cached_hash = hash(attribute_container)
+        
+        return self.cached_hash
+
+
+class PropertiesInfo:
+    
+    def __init__(self, temp_info = None):
+        if temp_info == None:
+            self.occurence_count = 0
+            self.average_fitness = 0
+        else:
+            self.occurence_count = temp_info.occurence_count
+            self.average_fitness = temp_info.average_fitness
+
+    def record(self, fitness):
+        """
+        Records a new fitness observation from a neural module.
+
+        Parameters
+        ----------
+        fitness: The neural module fitness.
+        """
+        # Get the total fitness until now.
+        total_fitness = self.occurence_count * self.average_fitness
+        self.occurence_count += 1
+        # Recalculate the average fitness.
+        self.average_fitness = (total_fitness + fitness) / self.occurence_count
+
+class TempPropertiesInfo(PropertiesInfo):
+
+    def __init__(self):
+        super().__init__()
+        self.time_to_leave = TEMP_MODULE_TTL
+    
+    def on_generation_increase(self):
+        """
+        Call this when a generation change(increase) occurs.
+
+        Returns
+        -------
+        delete: bool
+            True if the module should be deleted because it stayed in the temp
+            list too long(TTL expired), False otherwise.
+        """
+        if self.time_to_leave > 0:
+            self.time_to_leave -= 1
+        return self.time_to_leave == 0
+        
