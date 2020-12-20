@@ -1,4 +1,3 @@
-from module_manager import ModuleManager
 from module_properties import ModuleProperties
 import random as rnd
 import itertools as it
@@ -10,53 +9,41 @@ from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVAL
 
 class NeuralModule:
 
-    def __init__(self, parent_module, module_manager ,module_properties = None):
+    def __init__(self, parent_module, manager ,module_properties = None):
         # Network-specific properties.
         self.depth = 1 if parent_module == None else parent_module.depth + 1
+        
         self.parent_module = parent_module
         self.fitness = UNEVALUATED_FITNESS
         self.random_seed = rnd.randint(0,100)
         
-        self.module_manager = module_manager
+        self.manager = manager
 
         # Module properties.
         if module_properties == None:
-            # TODO: Get a random module_properties object.
-            module_properties = module_manager.get_random_notable_modules()
+            # Get a random module_properties object.
+            module_properties = manager.get_random_notable_modules()[0]
             pass
 
         # Set the module properties for this module. If there is no mutation, we
         # don't need to recalculate this object.
         self.module_properties = module_properties
-        
         self.layer = module_properties.layer
         self.module_type = module_properties.module_type
         self.abstract_graph = module_properties.abstract_graph
-        if self.module_type == ModuleType.NEURAL_LAYER:
+
+        if self.module_type == ModuleType.NEURAL_LAYER or self.depth == 1:
             # Set the number of (future) children.
             self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE)
         elif self.module_type == ModuleType.ABSTRACT_MODULE:
             # Generate children from properties files.
             self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
             pass
-        
-        # TODO: Remove.
-        """
-        if module_properties == None:
-            # Create a random module.
-            self.module_type = ModuleType.NEURAL_LAYER    ok
-            self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE) ok
-            # Assign layer to module.
-            self._assign_layer() not used
-        else:
-            # Use the module given to assign properties.
-            self.module_type = module_properties.module_type
-            self.abstract_graph = module_properties.abstract_graph
-            self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
-            self.layer = module_properties.layer
-        """
 
+        # Change module type if this is the root.
         if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
+
+
 
     def _generate_children_randomly(self):
         """
@@ -67,7 +54,7 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        return {child_idx : NeuralModule(self, self.module_manager) for child_idx in range(self.child_count)}
+        return {child_idx : NeuralModule(self, self.manager) for child_idx in range(self.child_count)}
 
     def _generate_children_from_properties(self, child_module_properties):
         """
@@ -84,7 +71,7 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        return {child_idx: NeuralModule(self, self.module_manager, properties) for child_idx, properties in enumerate(child_module_properties)}
+        return {child_idx: NeuralModule(self, self.manager, properties) for child_idx, properties in enumerate(child_module_properties)}
         
     def _init_abstract_graph(self):
         """ Create a random graph for this module. """
@@ -258,12 +245,15 @@ class NeuralModule:
         if (self.module_type == new_type): return
         self.module_type = new_type
         if new_type == ModuleType.ABSTRACT_MODULE:
-            self._generate_children_randomly()
+            self.child_modules = self._generate_children_randomly()
             # Try to create the abstract graph, until a random topology with no 
             # cycles is made.
             while True:
                 self._init_abstract_graph()
                 if self._graph_has_cycles(self.abstract_graph) == False: break
+            # This is technically a mutation, since we don't see this as a layer
+            # from now one, but rather as an abstract module.
+            self.on_mutation_occured()
                 
     def mutate(self):
         """ Perform mutation. """
@@ -488,9 +478,8 @@ class NeuralModule:
             # assigned to it.
             self.fitness = fitness
         
-        # Convert the neural module to a module_properties object and record its performance.
-        module_properties_object = self.get_module_properties()
-        self.module_manager.record_module_properties(module_properties_object)
+        # Record the module's performance on the manager.
+        self.manager.record_module_properties(self)
      
     def on_mutation_occured(self):
         """
@@ -500,7 +489,7 @@ class NeuralModule:
         self.fitness = UNEVALUATED_FITNESS
         self.module_properties = None
         if self.depth > 1:
-            self.parent_module.on_child_mutated()
+            self.parent_module.on_mutation_occured()
 
     def get_module_properties(self):
         """
@@ -513,11 +502,10 @@ class NeuralModule:
         """
         # This is none if a mutation occured.
         if self.module_properties == None:
-            # Get the child module properties.
-            child_module_properties = [child.to_module_properties() for child in self.child_modules]
+            # Get the child module properties. Sort the keys list to provide consistency.
+            child_module_properties = [self.child_modules[child_idx].get_module_properties() for child_idx in sorted(list(self.child_modules.keys()))]
             # Create and return object.
             self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
         
         return self.module_properties
-
 

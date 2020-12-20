@@ -1,8 +1,8 @@
 # Author: Aris Christoforidis
 
-from networkx.generators.random_graphs import fast_gnp_random_graph
-from config import TEMP_MODULE_TTL
+from enums import ModuleType
 from networkx.algorithms.graph_hashing import weisfeiler_lehman_graph_hash
+from config import TEMP_MODULE_TTL
 
 class ModuleProperties:
 
@@ -23,15 +23,19 @@ class ModuleProperties:
             The integer hash of the object.
         """
         if self.cached_hash == None:
-            # Hash the abstract graph.
-            abstract_graph_hash = weisfeiler_lehman_graph_hash(self.abstract_graph)
-            # Get the hashes of the children.
-            child_module_hashes = [hash(child_properties) for child_properties in self.child_module_properties]            
-            # Create a list with the attributes of self and children and convert it to a tuple to make it hashable.
-            attribute_container = [self.module_type, self.layer, abstract_graph_hash].extend(child_module_hashes)
-            attribute_container = tuple(attribute_container)
-            # Get the hash and cache it.
-            self.cached_hash = hash(attribute_container)
+            if self.module_type == ModuleType.NEURAL_LAYER:
+                self.cached_hash = hash(self.module_type)
+            else:
+                # Hash the abstract graph.
+                abstract_graph_hash = weisfeiler_lehman_graph_hash(self.abstract_graph)
+                # Get the hashes of the children.
+                child_module_hashes = [hash(child_properties) for child_properties in self.child_module_properties]            
+                # Create a list with the attributes of self and children and convert it to a tuple to make it hashable.
+                attribute_container = [self.module_type, self.layer, abstract_graph_hash]
+                attribute_container.extend(child_module_hashes)
+                attribute_container = tuple(attribute_container)
+                # Get the hash and cache it.
+                self.cached_hash = hash(attribute_container)
         
         return self.cached_hash
 

@@ -1,9 +1,8 @@
 # Author: Aris Christoforidis.
 
-from config import MAX_NOTABLE_MODULES
+from config import MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT
 from enums import ModuleType
 from module_properties import ModuleProperties, PropertiesInfo, TempPropertiesInfo
-from neural_module import NeuralModule
 from evaluation import Evaluator
 import random as rnd
 
@@ -50,7 +49,7 @@ class ModuleManager:
         """
         if restrict_to == None:
             # All modules considered.
-            candidates = self._notable_modules.keys()
+            candidates = list(self._notable_modules.keys())
             w = [info.average_fitness for info in self._notable_modules.values()]
         else:
             # Restricted to a type. May return an empty list.
@@ -102,8 +101,10 @@ class ModuleManager:
         # Get the minimum fitness value.
         min_fitness_threshold = info_list[-1].average_fitness
         
-        # Temp module list.
-        for module_properties, temp_info in self._candidate_modules:
+        # Candidate module list.
+        for module_properties, temp_info in self._candidate_modules.items():
+            # If this module has not been observed enough times, don't consider it.
+            if temp_info.occurence_count < MIN_PROPERTIES_OBS_COUNT: continue
             # If the candidate module has a fitness higher that the minimum on
             # the notable modules list, add it to the notable modules.
             if temp_info.average_fitness > min_fitness_threshold:
@@ -118,7 +119,7 @@ class ModuleManager:
 
             # Iterate through the dictionary and remove any entries below the
             # cutoff fitness value.
-            for module_properties, info in self._notable_modules:
+            for module_properties, info in self._notable_modules.items():
                 # Careful with the core layers.
                 # NOTE: I don't think that this is necessary, but its better to be safe.
                 # In fact this may be removed in the future with the logic being: if
