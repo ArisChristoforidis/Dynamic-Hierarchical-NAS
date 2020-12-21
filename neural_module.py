@@ -460,7 +460,54 @@ class NeuralModule:
         fitness: float
             The fitness value. If this is the first layer, pass the network accuracy.
         """
+        # Set module's fitness.
+        self.fitness = fitness
+        # NOTE: Is this necessary?
+        if self.module_type == ModuleType.NEURAL_LAYER: return
+        # The fitness is shared through the abstract network iteratively. When a split
+        # is needed, it is shared evenly.
+        abstract_nodes = list(self.abstract_graph.nodes())
+        # This will hold the fitness of every abstract node.
+        fitness_dict = {node: 0 for node in abstract_nodes}
+        # This will hold whether the node was visited or not.
+        processed_dict = {node: False for node in abstract_nodes}
+        # Pass the full fitness to the input node.
+        fitness_dict[NODE_INPUT_TAG] = fitness
+        processed_dict[NODE_INPUT_TAG] = True
+        # Get the incoming connections for each node.
+        connections_dict = {node:[source for source,_ in self.abstract_graph.in_edges(node)] for node in abstract_nodes}
+        contribution_dict = {node:{source: 0 for source,_ in self.abstract_graph.in_edges(node)} for node in abstract_nodes}
+        # Outgoing connection counts for each node.
+        outgoing_connections_dict = {node:self.abstract_graph.out_degree(node) for node in self.abstract_graph}
+        # These should not be processed.
+        abstract_nodes.remove(NODE_INPUT_TAG)
+        abstract_nodes.remove(NODE_OUTPUT_TAG)
+        while len(abstract_nodes) > 0:
+            # Iterate through the nodes for whom the fitness is not calculated.
+            for node in abstract_nodes:
+                # Iterate through their incoming connections.
+                for input_node in connections_dict[node]:
+                    # If this node has not submitted its contribution to the current
+                    # node and it is ready to do so.
+                    if contribution_dict[node][input_node] == 0 and processed_dict[input_node] == True:
+                        # The fitness contribution is equal to the fitness of the
+                        # input node divided by its out_degree == the number of nodes
+                        # it feeds.
+                        contribution_dict[node][input_node] = fitness_dict[input_node] / outgoing_connections_dict[input_node]
 
+                # If every incoming node has contributed, this node is processed.
+                if list(contribution_dict[node].values()).count(0) == 0:
+                    # Mark as done.
+                    processed_dict[node] = True
+                    abstract_nodes.remove(node)
+                    # Sum fitness.
+                    child_fitness = sum(contribution_dict[node].values())
+                    fitness_dict[node] = child_fitness
+                    # Pass the fitness to the lower level(recursively of course).
+                    child_module = self.child_modules[node]
+                    child_module.set_fitness(child_fitness)
+
+        """
         # For now the network fitness will be the accuracy divided by the number of
         # total nodes in the full graph of its children.
         if self.module_type == ModuleType.ABSTRACT_MODULE:
@@ -477,9 +524,10 @@ class NeuralModule:
             # When the module is a simple neural layer, the whole fitness is
             # assigned to it.
             self.fitness = fitness
-        
+        """
         # Record the module's performance on the manager.
         self.manager.record_module_properties(self)
+        
      
     def on_mutation_occured(self):
         """
