@@ -1,3 +1,4 @@
+from module_manager import ModuleManager
 from module_properties import ModuleProperties
 import random as rnd
 import itertools as it
@@ -9,7 +10,7 @@ from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVAL
 
 class NeuralModule:
 
-    def __init__(self, parent_module, manager ,module_properties = None):
+    def __init__(self, parent_module, manager : ModuleManager ,module_properties = None):
         # Network-specific properties.
         self.depth = 1 if parent_module == None else parent_module.depth + 1
         
@@ -275,11 +276,20 @@ class NeuralModule:
         if node_mutated or edge_mutated:
             self.on_mutation_occured()
 
-    def show_net(self):
+    def show_abstract_graph(self):
         """ Draws the neural network. """
-        nx.draw_spring(self.abstract_graph, with_labels=True, labels = self.child_modules)
+        labels_dict = {index: child.module_type for index, child in self.child_modules.items()}
+        labels_dict[NODE_INPUT_TAG] = NODE_INPUT_TAG
+        labels_dict[NODE_OUTPUT_TAG] = NODE_OUTPUT_TAG
+        nx.draw_spring(self.abstract_graph, with_labels=True, labels=labels_dict)
         plt.show()
     
+    def show_full_graph(self):
+        full_graph, layer_names, _, _ = self.get_graph()
+        if self.depth == 1:
+            nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
+            plt.show()
+
     def get_graph(self):
         """
         Iterate through all children, getting the subgraphs and create the full graph
@@ -410,11 +420,6 @@ class NeuralModule:
             full_graph.remove_node(key)
             layer_names.pop(key)
 
-        """
-        if self.depth == 1:
-            nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
-            plt.show()
-        """
 
         return full_graph, layer_names, input_idx, output_idx
 
@@ -527,8 +532,7 @@ class NeuralModule:
         """
         # Record the module's performance on the manager.
         self.manager.record_module_properties(self)
-        
-     
+          
     def on_mutation_occured(self):
         """
         When a mutation occurs, we need to reset the fitness of the module and
@@ -556,4 +560,4 @@ class NeuralModule:
             self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
         
         return self.module_properties
-
+        

@@ -38,6 +38,8 @@ def main():
         for module in population:
             if module.fitness == UNEVALUATED_FITNESS:
                 accuracy, time = evaluator.evaluate(module)
+                module.show_abstract_graph()
+                module.show_full_graph()
                 module.set_fitness(accuracy)
 
 

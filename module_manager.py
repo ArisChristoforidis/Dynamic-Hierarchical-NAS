@@ -64,30 +64,37 @@ class ModuleManager:
     
     def record_module_properties(self, neural_module):
         """
-        Receive a neural module and evaluate whether it should be added to the
-        notable_modules list.
+        Receive a (top level) neural module and evaluate whether it (or a child
+        module) should be added to the notable_modules list.
 
         Parameters
         ----------
         neural_module: NeuralModule
             A NeuralModule object.
         """
-        properties = neural_module.get_module_properties()
+        # Initialize the list by adding the properties of the root module.
+        properties_list = [neural_module.get_module_properties()]
 
-        # If this properties object describes a "notable" module 
-        if properties in self._notable_modules:
-            self._notable_modules[properties].record(neural_module.fitness)
-        else:
-            # If this is a new properties module, record it.
-            if properties not in self._candidate_modules:
-                self._candidate_modules[properties] = TempPropertiesInfo()
-            # Record fitness.
-            self._candidate_modules[properties].record(neural_module.fitness)
+        while len(properties_list) > 0:
+            # Pop the first element of the list for evaluation.
+            properties = properties_list.pop(0)
+            # Get this module's children properties and add them to the properties_list.
+            # This will ensure that all child modules will be examined.
+            properties_list.extend(properties.child_module_properties)
+
+            # If this properties object describes a "notable" module 
+            if properties in self._notable_modules:
+                self._notable_modules[properties].record(neural_module.fitness)
+            else:
+                # If this is a new properties module, record it.
+                if properties not in self._candidate_modules:
+                    self._candidate_modules[properties] = TempPropertiesInfo()
+                # Record fitness.
+                self._candidate_modules[properties].record(neural_module.fitness)
+
 
     def on_generation_increase(self):
-        """
-        Call this when a generation changes.
-        """
+        """ Call this when a generation changes. """
 
         # Update TTL for candidate modules and delete expired ones.
         for module_properties in self._candidate_modules:
