@@ -15,8 +15,8 @@ def main():
     
     # Initialize evaluator.
     # Switch to this to use nasbench.
-    evaluator = NasBenchEvaluator()
-    #evaluator = Evaluator()
+    #evaluator = NasBenchEvaluator()
+    evaluator = Evaluator()
 
     # Initialize module manager.
     manager = ModuleManager(evaluator)

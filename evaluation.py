@@ -1,9 +1,12 @@
 import re
+
+from torch.nn.modules.linear import Identity
 from nord.neural_nets import LocalEvaluator, BenchmarkEvaluator, NeuralDescriptor
 from nord.configs import INPUT_SHAPE
-from config import CHANNEL_COUNT, LAYER_INPUT_PREFIX, LAYER_OUTPUT_SUFFIX, METRIC, NODE_INPUT_TAG, STRIDE_COUNT
+from config import CHANNEL_COUNT, DROPOUT_PROBABILITY, LAYER_INPUT_PREFIX, LAYER_OUTPUT_SUFFIX, METRIC, NODE_INPUT_TAG, NODE_OUTPUT_TAG, STRIDE_COUNT
 from config import DATASET, EPOCHS, LAYERS_LIST
 from torch.optim import Adam
+import torch.nn as nn
 import traceback
 
 
@@ -69,29 +72,76 @@ class Evaluator:
         full_graph, layer_types, input_idx, output_idx = neural_module.get_graph()
         descriptor = NeuralDescriptor()        
 
-        # Add nodes.
+        # Add input/output layers.
+        input_layer_name = f"{input_idx}_{NODE_INPUT_TAG}"
+        output_layer_name = f"{output_idx}_{NODE_OUTPUT_TAG}"
+        descriptor.add_layer(nn.Identity, {}, name=input_layer_name)
+        descriptor.add_layer(nn.Identity, {}, name=output_layer_name)
+        descriptor.first_layer = input_layer_name
+        descriptor.last_layer = output_layer_name
+
+        # Add the rest of the nodes.
         nodes = full_graph.nodes()
         for node in nodes:
             # Skip input/output node, we already added them.
             if node == input_idx or node == output_idx: continue
             # Create correct layer and parameters according to layer type.
-            layer, kernel, params = re.split(pattern=r'_\.',string=layer_types[node])
+            layer_label = layer_types[node]
+            layer_name, kernel, params = re.split(pattern=r'[_\.]',string=layer_label)
             kernel = int(kernel)
-            is_convolutional = layer == 'CONV'
-            if layer == 'CONV':
-                pass
+            is_convolutional = layer_name == 'CONV'
+            # Convolutional layer.
+            if layer_name == 'CONV':
+                layer = nn.Conv1d
+                # The 'H' parameter means half channels.
+                channels = self.channels if params == 'H' else int(self.channels / 2)
+                parameters = {'in_channels': 1000,
+                              'out_channels': channels,
+                              'kernel_size': kernel,
+                              'stride': self.strides}
+            # Pooling layer.
+            elif layer_name == 'POOL':
+                layer = nn.MaxPool1d if params == 'M' else nn.AvgPool1d
+                parameters = {'kernel_size': kernel,
+                              'stride': kernel}
+            else:
+                # Not a known layer.
+                raise Exception(f'[Evaluator] Undefined layer "{layer_name}"')
+
+            # Add layer to descriptor.
+            layer_name_in = f"{node}_{layer_label}_{LAYER_INPUT_PREFIX}"
+            descriptor.add_layer(layer, parameters, name= layer_name_in)
+
+            # If dealing with a convolutional layer, add intermediate layers.
+            if is_convolutional == True:
+                layer_base_name = f"{node}" 
+                descriptor.add_layer_sequential(nn.ReLU6, {}, f"{layer_base_name}_RELU" )
+                descriptor.add_layer_sequential(nn.BatchNorm1d, {'num_features': channels},  f"{layer_base_name}_BATCHNORM") 
+                descriptor.add_layer_sequential(nn.Dropout, {'p': DROPOUT_PROBABILITY},  f"{layer_base_name}_DROPOUT")
+                
+            # Add layer output. This is done in this way to facilitate the extra
+            # layers that need to be added in the case of a convolutional base layer.
+            layer_name_out = f"{node}_{layer_label}_{LAYER_OUTPUT_SUFFIX}"
+            descriptor.add_layer_sequential(nn.Identity, {}, name=layer_name_out)
 
         # Connect layers by iterating through the graph edges.
         edges = full_graph.edges()
         for source,dest in edges:
             # Get source, dest layer names.
-            input_name =  str(source)
-            output_name = str(dest)
-            # Append input/output tag if they are not the INPUT/OUTPUT layers.
-            if source != input_idx: input_name += "_" + LAYER_OUTPUT_SUFFIX
-            if dest != output_idx: input_name += "_" + LAYER_INPUT_PREFIX
+            if source == input_idx:
+                source_name = f"{input_idx}_{NODE_INPUT_TAG}"
+            else:
+                layer_label = layer_types[source]
+                source_name = f"{source}_{layer_label}_{LAYER_OUTPUT_SUFFIX}"
+
+            if dest == output_idx:
+                dest_name = F"{output_idx}_{NODE_OUTPUT_TAG}"
+            else:
+                layer_label = layer_types[dest]
+                dest_name = f"{dest}_{layer_label}_{LAYER_INPUT_PREFIX}"
+
             # Connect.
-            descriptor.connect_layers(input_name, output_name)
+            descriptor.connect_layers(source_name, dest_name)
 
         return descriptor
 

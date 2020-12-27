@@ -20,6 +20,7 @@ LAYER_OUTPUT_SUFFIX = 'OUT'
 
 
 # PROBABILITY
+DROPOUT_PROBABILITY = 0.1
 
 # DATA
 DATASET = 'activity_recognition'
