@@ -72,18 +72,10 @@ class Evaluator:
         full_graph, layer_types, input_idx, output_idx = neural_module.get_graph()
         descriptor = NeuralDescriptor()        
 
-        # Add input/output layers.
-        input_layer_name = f"{input_idx}_{NODE_INPUT_TAG}"
-        output_layer_name = f"{output_idx}_{NODE_OUTPUT_TAG}"
-        descriptor.add_layer(nn.Identity, {}, name=input_layer_name)
-        descriptor.add_layer(nn.Identity, {}, name=output_layer_name)
-        descriptor.first_layer = input_layer_name
-        descriptor.last_layer = output_layer_name
-
         # Add the rest of the nodes.
         nodes = full_graph.nodes()
         for node in nodes:
-            # Skip input/output node, we already added them.
+            # Skip input/output node, we will add them later.
             if node == input_idx or node == output_idx: continue
             # Create correct layer and parameters according to layer type.
             layer_label = layer_types[node]
@@ -109,20 +101,35 @@ class Evaluator:
                 raise Exception(f'[Evaluator] Undefined layer "{layer_name}"')
 
             # Add layer to descriptor.
-            layer_name_in = f"{node}_{layer_label}_{LAYER_INPUT_PREFIX}"
-            descriptor.add_layer(layer, parameters, name= layer_name_in)
+            layer_name_in = f"{node}{LAYER_INPUT_PREFIX}"
+            descriptor.add_layer(layer, parameters, name=layer_name_in)
 
             # If dealing with a convolutional layer, add intermediate layers.
             if is_convolutional == True:
-                layer_base_name = f"{node}" 
-                descriptor.add_layer_sequential(nn.ReLU6, {}, f"{layer_base_name}_RELU" )
-                descriptor.add_layer_sequential(nn.BatchNorm1d, {'num_features': channels},  f"{layer_base_name}_BATCHNORM") 
-                descriptor.add_layer_sequential(nn.Dropout, {'p': DROPOUT_PROBABILITY},  f"{layer_base_name}_DROPOUT")
+                # NOTE: descriptor.add_layer_sequential() causes problems(naming inconsistencies).
+                relu_layer_name = f"{node}RELU"
+                batchnorm_layer_name = f"{node}BATCHNORM"
+                dropout_layer_name = f"{node}DROPOUT"
+                descriptor.add_layer(nn.ReLU6, {}, name=relu_layer_name )
+                descriptor.add_layer(nn.BatchNorm1d, {'num_features': channels},  name=batchnorm_layer_name) 
+                descriptor.add_layer(nn.Dropout, {'p': DROPOUT_PROBABILITY},  name=dropout_layer_name)
+                # Connect layers.
+                descriptor.connect_layers(layer_name_in,relu_layer_name)
+                descriptor.connect_layers(relu_layer_name,batchnorm_layer_name)
+                descriptor.connect_layers(batchnorm_layer_name,dropout_layer_name)
                 
             # Add layer output. This is done in this way to facilitate the extra
             # layers that need to be added in the case of a convolutional base layer.
-            layer_name_out = f"{node}_{layer_label}_{LAYER_OUTPUT_SUFFIX}"
+            layer_name_out = f"{node}{LAYER_OUTPUT_SUFFIX}"
             descriptor.add_layer_sequential(nn.Identity, {}, name=layer_name_out)
+
+        # Add input/output layers.
+        input_layer_name = f"{input_idx}_{NODE_INPUT_TAG}"
+        output_layer_name = f"{output_idx}_{NODE_OUTPUT_TAG}"
+        descriptor.add_layer(nn.Identity, {}, name=input_layer_name)
+        descriptor.add_layer(nn.Identity, {}, name=output_layer_name)
+        descriptor.first_layer = input_layer_name
+        descriptor.last_layer = output_layer_name
 
         # Connect layers by iterating through the graph edges.
         edges = full_graph.edges()
@@ -132,13 +139,13 @@ class Evaluator:
                 source_name = f"{input_idx}_{NODE_INPUT_TAG}"
             else:
                 layer_label = layer_types[source]
-                source_name = f"{source}_{layer_label}_{LAYER_OUTPUT_SUFFIX}"
+                source_name = f"{source}{LAYER_OUTPUT_SUFFIX}"
 
             if dest == output_idx:
                 dest_name = F"{output_idx}_{NODE_OUTPUT_TAG}"
             else:
                 layer_label = layer_types[dest]
-                dest_name = f"{dest}_{layer_label}_{LAYER_INPUT_PREFIX}"
+                dest_name = f"{dest}{LAYER_INPUT_PREFIX}"
 
             # Connect.
             descriptor.connect_layers(source_name, dest_name)

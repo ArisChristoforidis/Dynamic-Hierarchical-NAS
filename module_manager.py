@@ -17,18 +17,6 @@ class ModuleManager:
         self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, []) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
 
-    # NOTE: Not used.
-    def get_notable_modules(self):
-        """
-        Notable modules getter.
-
-        Returns
-        -------
-        notable_modules: dict(ModuleProperties->float)
-            The notable modules dict.
-        """
-        return self._notable_modules
-
     def get_random_notable_modules(self,count=1, restrict_to=None):
         """
         Get a random notable module, weighted using the fitness scores.
@@ -50,7 +38,7 @@ class ModuleManager:
         if restrict_to == None:
             # All modules considered.
             candidates = list(self._notable_modules.keys())
-            w = [info.average_fitness for info in self._notable_modules.values()]
+            w = [info.average_fitness for info in [self._notable_modules[module] for module in candidates]]
         else:
             # Restricted to a type. May return an empty list.
             candidates = [module for module in self._notable_modules.keys() if module.module_type == restrict_to]

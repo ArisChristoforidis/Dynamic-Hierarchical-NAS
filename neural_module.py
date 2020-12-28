@@ -478,24 +478,6 @@ class NeuralModule:
                     child_module = self.child_modules[node]
                     child_module.set_fitness(child_fitness)
 
-        """
-        # For now the network fitness will be the accuracy divided by the number of
-        # total nodes in the full graph of its children.
-        if self.module_type == ModuleType.ABSTRACT_MODULE:
-            # Set self fitness.
-            full_graph, _, _, _ = self.get_graph()
-            total_nodes = len(full_graph.nodes())
-            self.fitness = fitness / total_nodes
-            # Divide the fitness score equally among the abstract children.
-            child_fitness = fitness / len(self.child_modules)
-            child_modules = self.child_modules.values()
-            for child_module in child_modules:
-                child_module.set_fitness(child_fitness)
-        elif self.module_type == ModuleType.NEURAL_LAYER:
-            # When the module is a simple neural layer, the whole fitness is
-            # assigned to it.
-            self.fitness = fitness
-        """
         # Record the module's performance on the manager.
         self.manager.record_module_properties(self)
           

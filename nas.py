@@ -1,6 +1,6 @@
 # Author: Aris Christoforidis.
 from module_manager import ModuleManager
-from config import GENERATIONS, POPULATION_SIZE, UNEVALUATED_FITNESS
+from config import DELETE_NETWORKS_EVERY, GENERATIONS, NETWORK_REMAIN_PERCENTAGE, POPULATION_SIZE, UNEVALUATED_FITNESS
 from neural_module import NeuralModule
 from evaluation import Evaluator, NasBenchEvaluator
 from communication import Communicator
@@ -38,33 +38,29 @@ def main():
         for module in population:
             if module.fitness == UNEVALUATED_FITNESS:
                 accuracy, time = evaluator.evaluate(module)
-                module.show_abstract_graph()
-                module.show_full_graph()
+                # module.show_abstract_graph()
+                # module.show_full_graph()
                 module.set_fitness(accuracy)
 
 
-        # TODO: Eliminate weaker modules. TBD
+        # Eliminate weaker modules.
+        if generation % DELETE_NETWORKS_EVERY == 0:
+            # Sort based on fitness.
+            population.sort(key=lambda x: -x.fitness)
+            # Calculate how many networks to keep and throw away the rest.
+            networks_to_keep = int(NETWORK_REMAIN_PERCENTAGE * POPULATION_SIZE)
+            population = population[:networks_to_keep]
 
-        # TODO: Create new random modules. TBD
+            # Create new random modules.
+            networks_to_create = POPULATION_SIZE - networks_to_keep
+            population.extend([NeuralModule(None, manager) for _ in range(networks_to_create)])
+
+            # Logging.
+            fitness_threshold = population[networks_to_keep].fitness
+            print(f"Replacing {networks_to_create} networks. Fitness threshold: {fitness_threshold}")
 
         continue
 
-    """
-    # Do some example mutations.
-    for _ in range(5):
-        # Evaluate.
-        accuracy, time = evaluator.evaluate(neural_module)
-        neural_module.set_fitness(accuracy)
-        print(f"Accuracy: {accuracy:.2f} | Time: {time:.2f} sec")
-        
-        # Draw graph.
-        full_graph, layer_names, _, _ = neural_module.get_graph()
-        nx.draw_spring(full_graph,with_labels=True,labels=layer_names)
-        plt.show()
-        
-        # Mutate.
-        neural_module.mutate()
-    """
     print(f"Size: {communicator._get_size()}")
     return
 
