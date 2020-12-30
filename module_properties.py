@@ -50,6 +50,9 @@ class PropertiesInfo:
             self.occurence_count = temp_info.occurence_count
             self.average_fitness = temp_info.average_fitness
 
+    def get_total_fitness(self):
+        return self.occurence_count * self.average_fitness
+
     def record(self, fitness):
         """
         Records a new fitness observation from a neural module.
@@ -58,11 +61,9 @@ class PropertiesInfo:
         ----------
         fitness: The neural module fitness.
         """
-        # Get the total fitness until now.
-        total_fitness = self.occurence_count * self.average_fitness
         self.occurence_count += 1
         # Recalculate the average fitness.
-        self.average_fitness = (total_fitness + fitness) / self.occurence_count
+        self.average_fitness = (self.get_total_fitness() + fitness) / self.occurence_count
 
 class TempPropertiesInfo(PropertiesInfo):
 

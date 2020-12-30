@@ -38,11 +38,11 @@ class ModuleManager:
         if restrict_to == None:
             # All modules considered.
             candidates = list(self._notable_modules.keys())
-            w = [info.average_fitness for info in [self._notable_modules[module] for module in candidates]]
+            w = [info.get_total_fitness() for info in [self._notable_modules[module] for module in candidates]]
         else:
             # Restricted to a type. May return an empty list.
             candidates = [module for module in self._notable_modules.keys() if module.module_type == restrict_to]
-            w = [self._notable_modules[module] for module in candidates]
+            w = [self._notable_modules[module].get_total_fitness() for module in candidates]
         
         # If there are no numbers in here, divide probability evenly.
         if sum(w) <= 0: w = [1/len(w) for _ in w]

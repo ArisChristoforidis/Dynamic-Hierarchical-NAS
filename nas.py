@@ -26,6 +26,7 @@ def main():
 
     for generation in range(GENERATIONS):
         print(f"Generation {generation+1}")
+        generation_training_time = 0
 
         # Inform module manager for generation change.
         manager.on_generation_increase()
@@ -35,12 +36,16 @@ def main():
             module.mutate()
 
         # Evaluate those that where mutated.
-        for module in population:
+        for idx, module in enumerate(population):
             if module.fitness == UNEVALUATED_FITNESS:
                 accuracy, time = evaluator.evaluate(module)
+                generation_training_time += time
                 # module.show_abstract_graph()
                 # module.show_full_graph()
                 module.set_fitness(accuracy)
+                print(f"Neural module {idx+1}: {accuracy:.3f}")
+        print(f"Time elapsed: {generation_training_time:.2f} seconds")
+        print("="*50)
 
 
         # Eliminate weaker modules.
@@ -56,7 +61,7 @@ def main():
             population.extend([NeuralModule(None, manager) for _ in range(networks_to_create)])
 
             # Logging.
-            fitness_threshold = population[networks_to_keep].fitness
+            fitness_threshold = population[networks_to_keep-1].fitness
             print(f"Replacing {networks_to_create} networks. Fitness threshold: {fitness_threshold}")
 
         continue

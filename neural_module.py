@@ -5,7 +5,7 @@ import itertools as it
 import networkx as nx
 import matplotlib.pyplot as plt
 from enums import ConnectMode, ModuleType
-from config import MAX_EDGES, MAX_NODES, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
+from config import ADD_EDGE_PROBABILITY, ADD_NODE_PROBABILITY, NODE_INPUT_TAG, NODE_OUTPUT_TAG, UNEVALUATED_FITNESS, NODE_INTERNAL_COUNT_RANGE
 
 class NeuralModule:
 
@@ -258,19 +258,16 @@ class NeuralModule:
     def mutate(self):
         """ Perform mutation. """
         
-        full_graph,_,_,_ = self.get_graph()
-        node_count = len(full_graph.nodes())
-        edge_count = len(full_graph.edges())
-        
+        sample = rnd.uniform(0,1)
         node_mutated = False
-        # TODO: These should be checks just for probability.
-        if node_count < MAX_NODES:
-            node_mutated = self.mutate_node()
-        
         edge_mutated = False
-        if edge_count < MAX_EDGES:
+        # Mutate node.
+        if sample < ADD_NODE_PROBABILITY:
+            node_mutated = self.mutate_node()
+        # Mutate edge.
+        elif sample < ADD_NODE_PROBABILITY + ADD_EDGE_PROBABILITY:
             edge_mutated = self.mutate_connection()
-        
+
         # Update the fitness.
         if node_mutated or edge_mutated:
             self.on_mutation_occured()
