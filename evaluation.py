@@ -3,7 +3,7 @@ import re
 from torch.nn.modules.linear import Identity
 from nord.neural_nets import LocalEvaluator, BenchmarkEvaluator, NeuralDescriptor
 from nord.configs import INPUT_SHAPE
-from config import CHANNEL_COUNT, DROPOUT_PROBABILITY, LAYER_INPUT_PREFIX, LAYER_OUTPUT_SUFFIX, METRIC, NODE_INPUT_TAG, NODE_OUTPUT_TAG, STRIDE_COUNT
+from config import CHANNEL_COUNT, DROPOUT_PROBABILITY, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, LAYER_INPUT_PREFIX, LAYER_OUTPUT_SUFFIX, METRIC, NODE_INPUT_TAG, NODE_OUTPUT_TAG, STRIDE_COUNT
 from config import DATASET, EPOCHS, LAYERS_LIST
 from torch.optim import Adam
 import torch.nn as nn
@@ -42,12 +42,14 @@ class Evaluator:
         try:
             loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=EPOCHS, data_percentage=1, dataset=DATASET)
         except Exception:
+            return INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME
+            """
             print('Invalid Descriptor')
             print(descriptor)
             trace = traceback.format_exc()
             # TODO: Initialize error log.
             traceback.print_exc()
-        
+            """
         # TODO: History maybe.
 
         return fitness[METRIC], total_time
