@@ -98,6 +98,14 @@ class Evaluator:
                 layer = nn.MaxPool1d if params == 'M' else nn.AvgPool1d
                 parameters = {'kernel_size': kernel,
                               'stride': kernel}
+            elif layer_name == 'DROPOUT':
+                # For dropout layers, the kernel will be the kernel as a pct
+                layer = nn.Dropout
+                dropout_pct = kernel / 100
+                parameters = {'p': dropout_pct}
+            elif layer_name == 'RELU':
+                layer = nn.ReLU6
+                parameters = {}
             else:
                 # Not a known layer.
                 raise Exception(f'[Evaluator] Undefined layer "{layer_name}"')
