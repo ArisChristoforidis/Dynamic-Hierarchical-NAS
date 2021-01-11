@@ -1,10 +1,11 @@
 # Author: Aris Christoforidis.
 
-from config import MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT
+from config import BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_PROPERTIES_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT
 from enums import ModuleType
 from module_properties import ModuleProperties, PropertiesInfo, TempPropertiesInfo
 from evaluation import Evaluator
 import random as rnd
+import pickle as pkl
 
 class ModuleManager:
     """
@@ -14,8 +15,9 @@ class ModuleManager:
 
     def __init__(self, evaluator : Evaluator):
         # Create module properties objects for starting layers.
-        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, []) : PropertiesInfo() for layer in evaluator.get_available_layers()}
+        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
+        self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_PROPERTIES_LABEL : None }
 
     def get_random_notable_modules(self,count=1, restrict_to=None):
         """
@@ -76,9 +78,13 @@ class ModuleManager:
             else:
                 # If this is a new properties module, record it.
                 if properties not in self._candidate_modules:
-                    self._candidate_modules[properties] = TempPropertiesInfo()
+                    # More complex graphs modules will have a longer TTL.
+                    complexity = properties.total_nodes + properties.total_edges
+                    self._candidate_modules[properties] = TempPropertiesInfo(complexity)
                 # Record fitness.
                 self._candidate_modules[properties].record(neural_module.fitness)
+
+        # Compare it with the best module.
 
 
     def on_generation_increase(self):
@@ -109,11 +115,12 @@ class ModuleManager:
         # Notable module list.
         if len(self._notable_modules) > MAX_NOTABLE_MODULES:
             # Find the cutoff element and its value.
-            threshold_info = info_list[MAX_NOTABLE_MODULES]
-            min_fitness_value = threshold_info.average_fitness
-
+            sorted_notable_modules = sorted(self._notable_modules.values(),key=lambda x: -x.average_fitness)
+            min_fitness_value = sorted_notable_modules[MAX_NOTABLE_MODULES].average_fitness
+            
             # Iterate through the dictionary and remove any entries below the
             # cutoff fitness value.
+            marked_for_deletion = []
             for module_properties, info in self._notable_modules.items():
                 # Careful with the core layers.
                 # NOTE: I don't think that this is necessary, but its better to be safe.
@@ -123,8 +130,38 @@ class ModuleManager:
                 if module_properties.module_type == ModuleType.NEURAL_LAYER: continue
                 # Compare for potential removal.
                 if info.average_fitness < min_fitness_value:
-                    self._notable_modules.pop(module_properties)
+                    marked_for_deletion.append(module_properties)
+            
+            # Delete marked properties.
+            for properties in marked_for_deletion:
+                self._notable_modules.pop(properties)
 
-        # NOTE: Is this all?
+
+    def compare_with_best_module(self, neural_module, verbose=True):
+        """
+        Compares a (top level) module with the global best found thus far. If the
+        new module is better, the best one is replaced.
+
+        Parameters
+        ----------
+        neural_module: NeuralModule
+            A NeuralModule object.
+
+        verbose: bool
+            Whether or not to print diagnostics.
+        """
+
+        if neural_module.fitness > self.best_network_data[BEST_NETWORK_SCORE_LABEL]:
+            self.best_network_data[BEST_NETWORK_PROPERTIES_LABEL] = neural_module.get_module_properties()
+            self.best_network_data[BEST_NETWORK_SCORE_LABEL] = neural_module.fitness
+            if verbose == True:
+                print(f"A new best network was found with a fitness value of {neural_module.fitness:.3f}")
+
+
+    def save_best_module(self):
+        """ Saves the best module data in a pickle file. """
+        save_path = f"{BEST_NETWORK_DATA_SAVE_BASE_PATH}/activity_recognition_best.pkl" 
+        with open(save_path,'wb') as save_file:
+            pkl.dump(self.best_network_data, save_file)
 
             

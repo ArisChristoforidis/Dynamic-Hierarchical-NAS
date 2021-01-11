@@ -83,8 +83,10 @@ def main():
             print(f"Replacing {networks_to_create} networks. Fitness threshold: {fitness_threshold}")
 
         print("="*50)
-
-
+    
+    # Save best network.
+    manager.save_best_module()
+    
     print(f"Size: {communicator._get_size()}")
     return
 

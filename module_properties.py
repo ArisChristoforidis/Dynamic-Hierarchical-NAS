@@ -6,11 +6,15 @@ from config import TEMP_MODULE_TTL
 
 class ModuleProperties:
 
-    def __init__(self, module_type, layer, abstract_graph, child_module_properties):
+    def __init__(self, module_type, layer, abstract_graph, child_module_properties, total_nodes, total_edges):
         self.module_type = module_type
         self.layer = layer
         self.abstract_graph = abstract_graph
         self.child_module_properties = child_module_properties
+        # These are only used to calculate the complexity of the graph described 
+        # by the module properties object.
+        self.total_nodes = total_nodes
+        self.total_edges = total_edges
         self.cached_hash = None
 
     def __hash__(self):
@@ -67,9 +71,10 @@ class PropertiesInfo:
 
 class TempPropertiesInfo(PropertiesInfo):
 
-    def __init__(self):
+    def __init__(self, complexity):
         super().__init__()
-        self.time_to_leave = TEMP_MODULE_TTL
+
+        self.time_to_leave = TEMP_MODULE_TTL * complexity
     
     def on_generation_increase(self):
         """

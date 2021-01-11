@@ -501,8 +501,12 @@ class NeuralModule:
         if self.module_properties == None:
             # Get the child module properties. Sort the keys list to provide consistency.
             child_module_properties = [self.child_modules[child_idx].get_module_properties() for child_idx in sorted(list(self.child_modules.keys()))]
+            full_graph,_,_,_ = self.get_graph()
+            # Don't take into account the input/output nodes.
+            total_nodes = full_graph.number_of_nodes() - 2
+            total_edges = full_graph.number_of_edges() - 2
             # Create and return object.
-            self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties)
+            self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties, total_nodes, total_edges)
         
         return self.module_properties
         
