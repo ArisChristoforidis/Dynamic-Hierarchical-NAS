@@ -28,6 +28,7 @@ class NeuralModule:
         # Set the module properties for this module. If there is no mutation, we
         # don't need to recalculate this object.
         self.module_properties = module_properties
+        self.rebuild_module_properties = True
         self.layer = module_properties.layer
         self.module_type = module_properties.module_type
         self.abstract_graph = module_properties.abstract_graph
@@ -42,8 +43,6 @@ class NeuralModule:
 
         # Change module type if this is the root.
         if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
-
-
 
     def _generate_children_randomly(self):
         """
@@ -484,7 +483,7 @@ class NeuralModule:
         all its parent nodes.
         """
         self.fitness = UNEVALUATED_FITNESS
-        self.module_properties = None
+        self.rebuild_module_properties = True
         if self.depth > 1:
             self.parent_module.on_mutation_occured()
 
@@ -497,16 +496,34 @@ class NeuralModule:
         module_properties: ModuleProperties
             A module_properties object.
         """
-        # This is none if a mutation occured.
-        if self.module_properties == None:
-            # Get the child module properties. Sort the keys list to provide consistency.
-            child_module_properties = [self.child_modules[child_idx].get_module_properties() for child_idx in sorted(list(self.child_modules.keys()))]
-            full_graph,_,_,_ = self.get_graph()
-            # Don't take into account the input/output nodes.
-            total_nodes = full_graph.number_of_nodes() - 2
-            total_edges = full_graph.number_of_edges() - 2
-            # Create and return object.
-            self.module_properties = ModuleProperties(self.module_type, self.layer, self.abstract_graph, child_module_properties, total_nodes, total_edges)
+        # This can be turned to true through on_mutation_occured or from set_fitness.
+        if self.rebuild_module_properties == True:
+            self.rebuild_module_properties = False
+            if self.module_type == ModuleType.ABSTRACT_MODULE:
+                # Get the child module properties. Sort the keys list to provide consistency.
+                child_module_properties = [self.child_modules[child_idx].get_module_properties() for child_idx in sorted(list(self.child_modules.keys()))]
+                full_graph,_,_,_ = self.get_graph()
+                # Don't take into account the input/output nodes.
+                total_nodes = full_graph.number_of_nodes() - 2
+                total_edges = full_graph.number_of_edges() - 2
+                # Create and return object.
+                self.module_properties = ModuleProperties(module_type=self.module_type,
+                                                          layer=self.layer,
+                                                          abstract_graph=self.abstract_graph,
+                                                          child_module_properties=child_module_properties,
+                                                          fitness=self.fitness,
+                                                          total_nodes=total_nodes,
+                                                          total_edges=total_edges)
+            else:
+                # Neural layers don't have children, which means that 
+                # many of the properties can be ommited.
+                self.module_properties = ModuleProperties(module_type=self.module_type,
+                                                          layer=self.layer,
+                                                          abstract_graph=None,
+                                                          child_module_properties=None,
+                                                          fitness=self.fitness,
+                                                          total_nodes=1,
+                                                          total_edges=0)
         
         return self.module_properties
         

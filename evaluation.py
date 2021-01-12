@@ -42,10 +42,10 @@ class Evaluator:
         try:
             loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=EPOCHS, data_percentage=1, dataset=DATASET)
         except Exception:
-            return INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME
-            """
             print('Invalid Descriptor')
             print(descriptor)
+            return INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME
+            """
             trace = traceback.format_exc()
             # TODO: Initialize error log.
             traceback.print_exc()

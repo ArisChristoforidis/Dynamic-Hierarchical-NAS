@@ -15,7 +15,7 @@ class ModuleManager:
 
     def __init__(self, evaluator : Evaluator):
         # Create module properties objects for starting layers.
-        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
+        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], None, 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
         self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_PROPERTIES_LABEL : None }
 
@@ -68,13 +68,19 @@ class ModuleManager:
         while len(properties_list) > 0:
             # Pop the first element of the list for evaluation.
             properties = properties_list.pop(0)
-            # Get this module's children properties and add them to the properties_list.
-            # This will ensure that all child modules will be examined.
-            properties_list.extend(properties.child_module_properties)
+            
+            if properties.module_type == ModuleType.ABSTRACT_MODULE:
+                # Get this module's children properties and add them to the properties_list.
+                # This will ensure that all child modules will be examined.
+                properties_list.extend(properties.child_module_properties)
+
+            # NOTE: Maybe do a check for UNEVALUATED_FITNESS here?
+            #  Probably not necessary.
+            fitness = properties.module_fitness
 
             # If this properties object describes a "notable" module 
             if properties in self._notable_modules:
-                self._notable_modules[properties].record(neural_module.fitness)
+                self._notable_modules[properties].record(fitness)
             else:
                 # If this is a new properties module, record it.
                 if properties not in self._candidate_modules:
@@ -82,10 +88,10 @@ class ModuleManager:
                     complexity = properties.total_nodes + properties.total_edges
                     self._candidate_modules[properties] = TempPropertiesInfo(complexity)
                 # Record fitness.
-                self._candidate_modules[properties].record(neural_module.fitness)
+                self._candidate_modules[properties].record(fitness)
 
         # Compare it with the best module.
-
+        self.compare_with_best_module(neural_module)
 
     def on_generation_increase(self):
         """ Call this when a generation changes. """

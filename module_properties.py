@@ -6,11 +6,12 @@ from config import TEMP_MODULE_TTL
 
 class ModuleProperties:
 
-    def __init__(self, module_type, layer, abstract_graph, child_module_properties, total_nodes, total_edges):
+    def __init__(self, module_type, layer, abstract_graph, child_module_properties, fitness, total_nodes, total_edges):
         self.module_type = module_type
         self.layer = layer
         self.abstract_graph = abstract_graph
         self.child_module_properties = child_module_properties
+        self.module_fitness = fitness
         # These are only used to calculate the complexity of the graph described 
         # by the module properties object.
         self.total_nodes = total_nodes
