@@ -1,8 +1,9 @@
 # Author: Aris Christoforidis.
 
-from config import BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_PROPERTIES_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT
+from config import BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_PROPERTIES_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
 from enums import ModuleType
-from module_properties import ModuleProperties, PropertiesInfo, TempPropertiesInfo
+from module_properties import ModuleProperties
+from properties_info import PropertiesInfo, TempPropertiesInfo
 from evaluation import Evaluator
 import random as rnd
 import pickle as pkl
@@ -15,8 +16,9 @@ class ModuleManager:
 
     def __init__(self, evaluator : Evaluator):
         # Create module properties objects for starting layers.
-        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], None, 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
+        self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
+        self.best_module_updated = False
         self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_PROPERTIES_LABEL : None }
 
     def get_random_notable_modules(self,count=1, restrict_to=None):
@@ -42,6 +44,7 @@ class ModuleManager:
             candidates = list(self._notable_modules.keys())
             w = [info.get_total_fitness() for info in [self._notable_modules[module] for module in candidates]]
         else:
+            # NOTE: Not used.
             # Restricted to a type. May return an empty list.
             candidates = [module for module in self._notable_modules.keys() if module.module_type == restrict_to]
             w = [self._notable_modules[module].get_total_fitness() for module in candidates]
@@ -61,6 +64,32 @@ class ModuleManager:
         ----------
         neural_module: NeuralModule
             A NeuralModule object.
+        """
+
+        properties = neural_module.get_module_properties()
+        fitness = neural_module.fitness
+
+        # TODO: Remove in final version, this is a debug check.
+        assert fitness != UNEVALUATED_FITNESS, "Tries to record module with unevaluated fitness."
+        
+        if properties in self._notable_modules:
+                self._notable_modules[properties].record(fitness)
+        else:
+            # If this is a new properties module, record it.
+            if properties not in self._candidate_modules:
+                print("Adding a new module to the notable modules!")
+                # More complex graphs modules will have a longer TTL.
+                complexity = properties.total_nodes + properties.total_edges
+                self._candidate_modules[properties] = TempPropertiesInfo(complexity)
+            # Record fitness.
+            self._candidate_modules[properties].record(fitness)
+
+        # If this is a root module, compare it with the best module.(We know for certain
+        # that a non-root module will have less fitness)
+        if neural_module.depth == 1:
+            self.compare_with_best_module(neural_module)
+
+        # TODO: Delete if the new code is good.
         """
         # Initialize the list by adding the properties of the root module.
         properties_list = [neural_module.get_module_properties()]
@@ -84,6 +113,7 @@ class ModuleManager:
             else:
                 # If this is a new properties module, record it.
                 if properties not in self._candidate_modules:
+                    print("Adding a new module to the notable modules!")
                     # More complex graphs modules will have a longer TTL.
                     complexity = properties.total_nodes + properties.total_edges
                     self._candidate_modules[properties] = TempPropertiesInfo(complexity)
@@ -92,6 +122,7 @@ class ModuleManager:
 
         # Compare it with the best module.
         self.compare_with_best_module(neural_module)
+        """
 
     def on_generation_increase(self):
         """ Call this when a generation changes. """
@@ -160,14 +191,18 @@ class ModuleManager:
         if neural_module.fitness > self.best_network_data[BEST_NETWORK_SCORE_LABEL]:
             self.best_network_data[BEST_NETWORK_PROPERTIES_LABEL] = neural_module.get_module_properties()
             self.best_network_data[BEST_NETWORK_SCORE_LABEL] = neural_module.fitness
+            self.best_module_updated = True
             if verbose == True:
                 print(f"A new best network was found with a fitness value of {neural_module.fitness:.3f}")
 
 
     def save_best_module(self):
         """ Saves the best module data in a pickle file. """
-        save_path = f"{BEST_NETWORK_DATA_SAVE_BASE_PATH}/activity_recognition_best.pkl" 
+        save_path = f"{BEST_NETWORK_DATA_SAVE_BASE_PATH}/activity_recognition_best.pkl"
         with open(save_path,'wb') as save_file:
             pkl.dump(self.best_network_data, save_file)
+        
+        # Reset the save flag.
+        self.best_module_updated = False
 
             

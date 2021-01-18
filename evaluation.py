@@ -1,5 +1,4 @@
 import re
-
 from torch.nn.modules.linear import Identity
 from nord.neural_nets import LocalEvaluator, BenchmarkEvaluator, NeuralDescriptor
 from nord.configs import INPUT_SHAPE

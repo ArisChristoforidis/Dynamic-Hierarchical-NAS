@@ -46,6 +46,8 @@ def main():
                 # for deletion.
                 if accuracy == INVALID_NETWORK_FITNESS and time == INVALID_NETWORK_TIME:
                     print(f"Network {idx} could not be evaluated, replacing.")
+                    # Add another neural module to the population.(Evaluated in 
+                    # this generation)
                     population.append(NeuralModule(None, manager))
                     invalid_modules.append(module)
                     continue
@@ -56,7 +58,7 @@ def main():
                 module.set_fitness(accuracy)
                 print(f"Neural module {idx+1}: {accuracy:.3f}")
 
-        print(f"Time elapsed: {generation_training_time:.2f} seconds")
+        print(f"Time elapsed: {generation_training_time /60:.2f} minutes")
         
         # Print best module fitness.
         best_module = max(population, key=lambda x: x.fitness)
@@ -65,6 +67,8 @@ def main():
         # Remove invalid modules.
         for module in invalid_modules:
             population.remove(module)
+
+        print(f"Notable module count: {len(manager._notable_modules)}")
 
         # Eliminate weaker modules.
         if generation % DELETE_NETWORKS_EVERY == 0:
@@ -84,8 +88,9 @@ def main():
 
         print("="*50)
     
-    # Save best network.
-    manager.save_best_module()
+        # Save best network if it changed.
+        if manager.best_module_updated == True:
+            manager.save_best_module()
     
     print(f"Size: {communicator._get_size()}")
     return
