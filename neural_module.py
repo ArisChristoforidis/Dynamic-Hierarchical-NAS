@@ -32,16 +32,16 @@ class NeuralModule:
         self.module_type = module_properties.module_type
         self.abstract_graph = module_properties.abstract_graph
 
-        if self.module_type == ModuleType.NEURAL_LAYER or self.depth == 1:
+        if self.module_type == ModuleType.NEURAL_LAYER:
             # Set the number of (future) children.
             self.child_count = rnd.choice(NODE_INTERNAL_COUNT_RANGE)
+            # Change module type if this is the root.
+            if self.depth == 1:
+                self.change_module_type(ModuleType.ABSTRACT_MODULE)
         elif self.module_type == ModuleType.ABSTRACT_MODULE:
             # Generate children from properties files.
             self.child_modules = self._generate_children_from_properties(module_properties.child_module_properties)
             pass
-
-        # Change module type if this is the root.
-        if self.depth == 1: self.change_module_type(ModuleType.ABSTRACT_MODULE)
 
     def _generate_children_randomly(self):
         """
