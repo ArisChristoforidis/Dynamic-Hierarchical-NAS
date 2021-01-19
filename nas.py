@@ -20,6 +20,8 @@ def main():
 
     # Initialize module manager.
     manager = ModuleManager(evaluator)
+    for i in manager._notable_modules:
+        print(hash(i))
 
     # Make initial population.
     population = [NeuralModule(None, manager) for _ in range(POPULATION_SIZE)]

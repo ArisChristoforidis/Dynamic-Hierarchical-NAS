@@ -42,12 +42,12 @@ class ModuleManager:
         if restrict_to == None:
             # All modules considered.
             candidates = list(self._notable_modules.keys())
-            w = [info.get_total_fitness() for info in [self._notable_modules[module] for module in candidates]]
+            w = [self._notable_modules[module_property].get_total_fitness() / module_property.complexity for module_property in candidates]
         else:
             # NOTE: Not used.
             # Restricted to a type. May return an empty list.
-            candidates = [module for module in self._notable_modules.keys() if module.module_type == restrict_to]
-            w = [self._notable_modules[module].get_total_fitness() for module in candidates]
+            candidates = [module_property for module_property in self._notable_modules.keys() if module_property.module_type == restrict_to]
+            w = [self._notable_modules[module_property].get_total_fitness() for module_property in candidates]
         
         # If there are no numbers in here, divide probability evenly.
         if sum(w) <= 0: w = [1/len(w) for _ in w]
@@ -70,17 +70,16 @@ class ModuleManager:
         fitness = neural_module.fitness
 
         # TODO: Remove in final version, this is a debug check.
-        assert fitness != UNEVALUATED_FITNESS, "Tries to record module with unevaluated fitness."
+        assert fitness != UNEVALUATED_FITNESS, "Tried to record module with unevaluated fitness."
         
         if properties in self._notable_modules:
                 self._notable_modules[properties].record(fitness)
         else:
             # If this is a new properties module, record it.
             if properties not in self._candidate_modules:
-                print("Adding a new module to the notable modules!")
+                print(f"Adding a new module to the candidate modules! ({properties.layer},{properties.module_type},{hash(properties)})")
                 # More complex graphs modules will have a longer TTL.
-                complexity = properties.total_nodes + properties.total_edges
-                self._candidate_modules[properties] = TempPropertiesInfo(complexity)
+                self._candidate_modules[properties] = TempPropertiesInfo(properties.complexity)
             # Record fitness.
             self._candidate_modules[properties].record(fitness)
 
@@ -90,39 +89,6 @@ class ModuleManager:
             self.compare_with_best_module(neural_module)
 
         # TODO: Delete if the new code is good.
-        """
-        # Initialize the list by adding the properties of the root module.
-        properties_list = [neural_module.get_module_properties()]
-
-        while len(properties_list) > 0:
-            # Pop the first element of the list for evaluation.
-            properties = properties_list.pop(0)
-            
-            if properties.module_type == ModuleType.ABSTRACT_MODULE:
-                # Get this module's children properties and add them to the properties_list.
-                # This will ensure that all child modules will be examined.
-                properties_list.extend(properties.child_module_properties)
-
-            # NOTE: Maybe do a check for UNEVALUATED_FITNESS here?
-            #  Probably not necessary.
-            fitness = properties.module_fitness
-
-            # If this properties object describes a "notable" module 
-            if properties in self._notable_modules:
-                self._notable_modules[properties].record(fitness)
-            else:
-                # If this is a new properties module, record it.
-                if properties not in self._candidate_modules:
-                    print("Adding a new module to the notable modules!")
-                    # More complex graphs modules will have a longer TTL.
-                    complexity = properties.total_nodes + properties.total_edges
-                    self._candidate_modules[properties] = TempPropertiesInfo(complexity)
-                # Record fitness.
-                self._candidate_modules[properties].record(fitness)
-
-        # Compare it with the best module.
-        self.compare_with_best_module(neural_module)
-        """
 
     def on_generation_increase(self):
         """ Call this when a generation changes. """
@@ -146,6 +112,7 @@ class ModuleManager:
             # If the candidate module has a fitness higher that the minimum on
             # the notable modules list, add it to the notable modules.
             if temp_info.average_fitness > min_fitness_threshold:
+                print(f"Adding a new module to the notable modules! ({module_properties.layer},{module_properties.module_type},{hash(module_properties)})")
                 info = PropertiesInfo(temp_info)
                 self._notable_modules[module_properties] = info
 

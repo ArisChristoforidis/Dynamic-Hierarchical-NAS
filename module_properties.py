@@ -1,5 +1,6 @@
 # Author: Aris Christoforidis
 
+from networkx.algorithms import graph_hashing
 from enums import ModuleType
 from networkx.algorithms.graph_hashing import weisfeiler_lehman_graph_hash
 from config import TEMP_MODULE_TTL
@@ -15,7 +16,31 @@ class ModuleProperties:
         # by the module properties object.
         self.total_nodes = total_nodes
         self.total_edges = total_edges
+        self.complexity = total_nodes + total_edges
         self.cached_hash = None
+
+    def __eq__(self, other):
+        """
+        Equality comparator for the module properties object.
+
+        Parameters
+        ----------
+        other: ModuleProperties
+            A ModuleProperties object.
+
+        Returns
+        -------
+        eq: bool
+            True if objects are equal, False, otherwise.
+        """
+        # Occurs at the first comparison of the best module on module_manager.
+        if other == None: return False
+        
+        modules_equal = self.module_type == other.module_type
+        layer_equal = self.layer == other.layer
+        graph_equal = self.abstract_graph == other.abstract_graph
+        children_equal = self.child_module_properties == other.child_module_properties
+        return modules_equal and layer_equal and graph_equal and children_equal
 
     def __hash__(self):
         """
@@ -28,6 +53,7 @@ class ModuleProperties:
         """
         if self.cached_hash == None:
             if self.module_type == ModuleType.NEURAL_LAYER:
+                print(f"Generating a hash for a neural layer ({self.layer})")
                 attribute_container = (self.module_type, self.layer)
             else:
                 # Hash the abstract graph.

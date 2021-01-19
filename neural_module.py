@@ -431,6 +431,9 @@ class NeuralModule:
         """
         # Set module's fitness.
         self.fitness = fitness
+        # Record the module's performance on the manager.
+        self.manager.record_module_properties(self)
+
         # NOTE: Is this necessary?
         if self.module_type == ModuleType.NEURAL_LAYER: return
         # The fitness is shared through the abstract network iteratively. When a split
@@ -475,9 +478,6 @@ class NeuralModule:
                     # Pass the fitness to the lower level(recursively of course).
                     child_module = self.child_modules[node]
                     child_module.set_fitness(child_fitness)
-
-        # Record the module's performance on the manager.
-        self.manager.record_module_properties(self)
           
     def on_mutation_occured(self):
         """
