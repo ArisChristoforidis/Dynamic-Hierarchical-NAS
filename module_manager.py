@@ -106,6 +106,7 @@ class ModuleManager:
         min_fitness_threshold = info_list[-1].average_fitness
         
         # Candidate module list.
+        marked_for_deletion = []
         for module_properties, temp_info in self._candidate_modules.items():
             # If this module has not been observed enough times, don't consider it.
             if temp_info.occurence_count < MIN_PROPERTIES_OBS_COUNT: continue
@@ -115,6 +116,12 @@ class ModuleManager:
                 print(f"Adding a new module to the notable modules! ({module_properties.layer},{module_properties.module_type},{hash(module_properties)})")
                 info = PropertiesInfo(temp_info)
                 self._notable_modules[module_properties] = info
+                # Mark the module to be removed from the candidates.
+                marked_for_deletion.append(module_properties)
+        
+        # Delete the properties from the notable modules.
+        for module_properties in marked_for_deletion:
+            self._candidate_modules.pop(module_properties)
 
         # Notable module list.
         if len(self._notable_modules) > MAX_NOTABLE_MODULES:
