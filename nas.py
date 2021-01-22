@@ -1,6 +1,8 @@
 # Author: Aris Christoforidis.
+from enums import SaveMode
+from nas_state import NasState
 from module_manager import ModuleManager
-from config import DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, NETWORK_REMAIN_PERCENTAGE, POPULATION_SIZE, UNEVALUATED_FITNESS
+from config import DATASET, DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, NETWORK_REMAIN_PERCENTAGE, POPULATION_SIZE, UNEVALUATED_FITNESS
 from neural_module import NeuralModule
 from evaluation import Evaluator, NasBenchEvaluator
 from communication import Communicator
@@ -9,25 +11,38 @@ from mpi4py import MPI
 import networkx as nx
 import matplotlib.pyplot as plt
 
+LOAD_FROM_CHECKPOINT = False
+
 def main():
     # Establish communication.
     communicator = Communicator()
     
-    # Initialize evaluator.
-    # Switch to this to use nasbench.
-    #evaluator = NasBenchEvaluator()
-    evaluator = Evaluator()
+    # Create new nas state(saving).
+    if LOAD_FROM_CHECKPOINT == False:
+        # Initialize evaluator.
+        # Switch to this to use nasbench.
+        #evaluator = NasBenchEvaluator()
+        evaluator = Evaluator()
+        # Initialize module manager.
+        manager = ModuleManager(evaluator)
+        # Make initial population.
+        population = [NeuralModule(None, manager) for _ in range(POPULATION_SIZE)]
+        starting_generation = 0
+        state = NasState(name=DATASET,
+                         evaluator=evaluator,
+                         module_manager=manager,
+                         population=population,
+                         generation=starting_generation)
+    else:
+        # Load the latest checkpoint.
+        state = NasState.load(name=DATASET, mode=SaveMode.PICKLE)
+        evaluator = state.evaluator
+        manager = state.module_manager
+        population = state.population
+        starting_generation = state.generation
 
-    # Initialize module manager.
-    manager = ModuleManager(evaluator)
-    for i in manager._notable_modules:
-        print(hash(i))
-
-    # Make initial population.
-    population = [NeuralModule(None, manager) for _ in range(POPULATION_SIZE)]
-
-    for generation in range(GENERATIONS):
-        print(f"Generation {generation+1}")
+    for generation in range(starting_generation, GENERATIONS):
+        print(f"Generation {generation}")
         generation_training_time = 0
 
         # Inform module manager for generation change.
@@ -93,6 +108,9 @@ def main():
         # Save best network if it changed.
         if manager.best_module_updated == True:
             manager.on_best_module_updated()
+        
+        # Save checkpoint.
+        state.save(generation=generation, mode=SaveMode.PICKLE)
     
     print(f"Size: {communicator._get_size()}")
     return
