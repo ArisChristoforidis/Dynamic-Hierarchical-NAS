@@ -1,6 +1,6 @@
 # Author: Aris Christoforidis.
 
-from config import BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_PROPERTIES_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
+from config import BEST_MODULE_EVALUATION_EPOCHS, BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
 from enums import ModuleType
 from module_properties import ModuleProperties
 from properties_info import PropertiesInfo, TempPropertiesInfo
@@ -16,10 +16,11 @@ class ModuleManager:
 
     def __init__(self, evaluator : Evaluator):
         # Create module properties objects for starting layers.
+        self.evaluator = evaluator
         self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
         self.best_module_updated = False
-        self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_PROPERTIES_LABEL : None }
+        self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_LABEL : None }
 
     def get_random_notable_modules(self,count=1, restrict_to=None):
         """
@@ -163,11 +164,17 @@ class ModuleManager:
         """
 
         if neural_module.fitness > self.best_network_data[BEST_NETWORK_SCORE_LABEL]:
-            self.best_network_data[BEST_NETWORK_PROPERTIES_LABEL] = neural_module.get_module_properties()
+            self.best_network_data[BEST_NETWORK_LABEL] = neural_module
             self.best_network_data[BEST_NETWORK_SCORE_LABEL] = neural_module.fitness
             self.best_module_updated = True
-            if verbose == True:
-                print(f"A new best network was found with a fitness value of {neural_module.fitness:.3f}")
+
+    def on_best_module_updated(self, verbose=True):
+        # Evaluate the best module fitness on more training epochs.
+        self.save_best_module()
+        best_module = self.best_network_data[BEST_NETWORK_LABEL]
+        accuracy, _ = self.evaluator.evaluate(best_module, evaluation_epochs=BEST_MODULE_EVALUATION_EPOCHS)
+        if verbose == True:
+            print(f"A new best network was found with an accuracy value of {accuracy:.3f}")
 
 
     def save_best_module(self):

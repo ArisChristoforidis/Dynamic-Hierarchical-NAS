@@ -52,7 +52,6 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        print("Generating neural module randomly!")
         return {child_idx : NeuralModule(self, self.manager) for child_idx in range(self.child_count)}
 
     def _generate_children_from_properties(self, child_module_properties):
@@ -70,8 +69,6 @@ class NeuralModule:
         child_modules: dict(int->NeuralModule)
             The child_modules dict.
         """
-        print("Generating neural module from properties!")
-        print(f"Child module properties size: {len(child_module_properties)}")
         return {child_idx: NeuralModule(self, self.manager, properties) for child_idx, properties in enumerate(child_module_properties)}
         
     def _init_abstract_graph(self):

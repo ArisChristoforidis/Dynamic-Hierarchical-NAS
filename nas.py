@@ -92,7 +92,7 @@ def main():
     
         # Save best network if it changed.
         if manager.best_module_updated == True:
-            manager.save_best_module()
+            manager.on_best_module_updated()
     
     print(f"Size: {communicator._get_size()}")
     return

@@ -3,7 +3,7 @@ from torch.nn.modules.linear import Identity
 from nord.neural_nets import LocalEvaluator, BenchmarkEvaluator, NeuralDescriptor
 from nord.configs import INPUT_SHAPE
 from config import CHANNEL_COUNT, DROPOUT_PROBABILITY, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, LAYER_INPUT_PREFIX, LAYER_OUTPUT_SUFFIX, METRIC, NODE_INPUT_TAG, NODE_OUTPUT_TAG, STRIDE_COUNT
-from config import DATASET, EPOCHS, LAYERS_LIST
+from config import DATASET, TRAINING_EPOCHS, LAYERS_LIST
 from torch.optim import Adam
 import torch.nn as nn
 import traceback
@@ -16,7 +16,7 @@ class Evaluator:
         self.channels = CHANNEL_COUNT
         self.strides = STRIDE_COUNT
 
-    def evaluate(self, neural_module):
+    def evaluate(self, neural_module, evaluation_epochs=TRAINING_EPOCHS):
         """
         Evaluates a network represented by a neural module.
 
@@ -39,7 +39,8 @@ class Evaluator:
         fitness = {METRIC: 0}
         total_time = 0
         try:
-            loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=EPOCHS, data_percentage=1, dataset=DATASET)
+            print("=" * 128)
+            loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=evaluation_epochs, data_percentage=1, dataset=DATASET)
         except Exception:
             print('Invalid Descriptor')
             print(descriptor)

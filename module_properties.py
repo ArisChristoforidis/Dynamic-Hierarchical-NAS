@@ -53,7 +53,6 @@ class ModuleProperties:
         """
         if self.cached_hash == None:
             if self.module_type == ModuleType.NEURAL_LAYER:
-                print(f"Generating a hash for a neural layer ({self.layer})")
                 attribute_container = (self.module_type, self.layer)
             else:
                 # Hash the abstract graph.
