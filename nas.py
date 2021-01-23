@@ -6,9 +6,7 @@ from config import DATASET, DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_
 from neural_module import NeuralModule
 from evaluation import Evaluator, NasBenchEvaluator
 from communication import Communicator
-from mpi4py import MPI
 
-import networkx as nx
 import matplotlib.pyplot as plt
 
 LOAD_FROM_CHECKPOINT = False
@@ -28,11 +26,7 @@ def main():
         # Make initial population.
         population = [NeuralModule(None, manager) for _ in range(POPULATION_SIZE)]
         starting_generation = 0
-        state = NasState(name=DATASET,
-                         evaluator=evaluator,
-                         module_manager=manager,
-                         population=population,
-                         generation=starting_generation)
+        state = NasState(name=DATASET, evaluator=evaluator)
     else:
         # Load the latest checkpoint.
         state = NasState.load(name=DATASET, mode=SaveMode.PICKLE)
@@ -110,7 +104,7 @@ def main():
             manager.on_best_module_updated()
         
         # Save checkpoint.
-        state.save(generation=generation, mode=SaveMode.PICKLE)
+        state.save(generation=generation, population=population, module_manager=manager, mode=SaveMode.PICKLE)
     
     print(f"Size: {communicator._get_size()}")
     return

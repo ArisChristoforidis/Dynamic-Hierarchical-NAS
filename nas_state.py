@@ -3,6 +3,7 @@
 import glob
 import os
 import pickle
+from copy import deepcopy
 from config import NAS_STATE_SAVE_BASE_PATH
 from enums import SaveMode
 from evaluation import Evaluator
@@ -10,18 +11,19 @@ from module_manager import ModuleManager
 
 class NasState:
 
-    def __init__(self, name: str, evaluator: Evaluator, module_manager: ModuleManager, population: list, generation: int):
+    def __init__(self, name: str, evaluator: Evaluator):
         """
         Holds references to all critical components of the search and saves them
         when needed.
         """
         self.name = name
-        self.evaluator = evaluator        
-        self.module_manager = module_manager
-        self.population = population
-        self.generation = generation
+        self.evaluator = evaluator
+        # Initialized after the first generation.
+        self.module_manager = None
+        self.population = None
+        self.generation = 0
     
-    def save(self, generation: int, mode: SaveMode, ovewrite: bool = True):
+    def save(self, generation: int, population: list, module_manager: ModuleManager, mode: SaveMode, ovewrite: bool = True):
         """
         Saves the nas state.
         
@@ -36,6 +38,12 @@ class NasState:
         overwrite: bool
             If True overwrites the old state.
         """
+        # These need to be copies because their references are altered during a 
+        # generation. We want the intact population and module_manager as is before
+        # entering the next generation.
+        self.population = deepcopy(population)
+        self.module_manager = deepcopy(module_manager)
+
         if mode == SaveMode.PICKLE:
             self._save_pickle(generation, ovewrite)
         elif mode == SaveMode.CONSOLE_LOG:
@@ -186,4 +194,3 @@ class NasState:
             The loaded nas state.
         """
         raise NotImplementedError
-
