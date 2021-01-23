@@ -186,4 +186,3 @@ class NasState:
             The loaded nas state.
         """
         raise NotImplementedError
-

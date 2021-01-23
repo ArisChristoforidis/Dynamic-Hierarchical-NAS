@@ -6,9 +6,7 @@ from config import DATASET, DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_
 from neural_module import NeuralModule
 from evaluation import Evaluator, NasBenchEvaluator
 from communication import Communicator
-from mpi4py import MPI
 
-import networkx as nx
 import matplotlib.pyplot as plt
 
 LOAD_FROM_CHECKPOINT = False
