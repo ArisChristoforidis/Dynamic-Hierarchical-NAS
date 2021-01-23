@@ -9,7 +9,7 @@ from communication import Communicator
 
 import matplotlib.pyplot as plt
 
-LOAD_FROM_CHECKPOINT = False
+LOAD_FROM_CHECKPOINT = True
 
 def main():
     # Establish communication.

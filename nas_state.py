@@ -74,7 +74,7 @@ class NasState:
         overwrite: bool
             If True overwrites the old state.
         """
-        self._update_generation(generation)
+        self._update_generation(generation+1)
         save_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{generation}.pkl"
         with open(save_path,'wb') as save_file:
             pickle.dump(self,save_file)
