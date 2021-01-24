@@ -3,6 +3,7 @@
 import glob
 import os
 import pickle
+import bz2
 from copy import deepcopy
 from config import NAS_STATE_SAVE_BASE_PATH
 from enums import SaveMode
@@ -75,13 +76,13 @@ class NasState:
             If True overwrites the old state.
         """
         self._update_generation(generation+1)
-        save_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{generation}.pkl"
-        with open(save_path,'wb') as save_file:
-            pickle.dump(self,save_file)
+        save_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation}.pbz2"
+        with bz2.BZ2File(save_path,'wb') as save_file:
+            pickle.dump(self, save_file, protocol=pickle.HIGHEST_PROTOCOL)
 
         # Delete old file.
-        if overwrite == True and self.generation > 0:
-            old_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{generation-1}.pkl"
+        if overwrite == True and self.generation > 1:
+            old_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation-1}.pbz2"
             os.remove(old_path)
     
     def _save_log(self, generation: int, overwrite: bool):
@@ -144,7 +145,7 @@ class NasState:
         state_file_path: str
             The requested state file.
         """
-        ext = '.pkl' if mode == SaveMode.PICKLE else '.log'
+        ext = '.pbz2' if mode == SaveMode.PICKLE else '.log'
         print(os.listdir(f"{NAS_STATE_SAVE_BASE_PATH}/"))
         file_paths = glob.glob(f"{NAS_STATE_SAVE_BASE_PATH}/*")
         # Get all files that contain the name of the data set.
@@ -173,7 +174,7 @@ class NasState:
             The loaded nas state.
         """
         file_path = NasState._get_state_file_path(name, SaveMode.PICKLE)
-        with open(file_path,'rb') as state_file:
+        with bz2.BZ2File(file_path,'rb') as state_file:
             state = pickle.load(state_file)
 
         return state
