@@ -222,7 +222,7 @@ class AbstractNeuralEvaluator():
         """
         self.load_data(data_percentage, dataset)
         net = self.descriptor_to_net(descriptor, untrained)
-        print(net)
+        # print(net)
         return self.net_evaluate(net,  epochs, data_percentage,
                                  untrained, dataset)
 

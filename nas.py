@@ -73,12 +73,13 @@ def main():
         
         # Print best module fitness.
         best_module = max(population, key=lambda x: x.fitness)
-        print(f"Best module fitness: {best_module.fitness:.2f}")
+        print(f"Generation best module fitness: {best_module.fitness:.3f}")
 
         # Remove invalid modules.
         for module in invalid_modules:
             population.remove(module)
 
+        print(f"Candidate module count: {len(manager._candidate_modules)}")
         print(f"Notable module count: {len(manager._notable_modules)}")
 
         # Eliminate weaker modules.

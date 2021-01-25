@@ -95,9 +95,13 @@ class ModuleManager:
         """ Call this when a generation changes. """
 
         # Update TTL for candidate modules and delete expired ones.
+        marked_for_deletion = []
         for module_properties in self._candidate_modules:
             should_delete = self._candidate_modules[module_properties].on_generation_increase()
-            if should_delete == True: self._candidate_modules.pop(module_properties)
+            if should_delete == True: marked_for_deletion.append(module_properties)
+        
+        for module_properties in marked_for_deletion:
+            self._candidate_modules.pop(module_properties)
 
         # Get the info list and sort the list based on the average fitness 
         # of the notable modules.
