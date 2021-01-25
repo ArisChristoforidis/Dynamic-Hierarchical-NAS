@@ -146,7 +146,6 @@ class NasState:
             The requested state file.
         """
         ext = '.pbz2' if mode == SaveMode.PICKLE else '.log'
-        print(os.listdir(f"{NAS_STATE_SAVE_BASE_PATH}/"))
         file_paths = glob.glob(f"{NAS_STATE_SAVE_BASE_PATH}/*")
         # Get all files that contain the name of the data set.
         file_paths = [path for path in file_paths if name in path and path.endswith(ext)]
