@@ -39,7 +39,7 @@ class Evaluator:
         fitness = {METRIC: 0}
         total_time = 0
         try:
-            print("=" * 128)
+            print("-" * 128)
             loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=evaluation_epochs, data_percentage=1, dataset=DATASET)
         except Exception:
             print('Invalid Descriptor')

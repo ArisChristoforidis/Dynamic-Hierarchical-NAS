@@ -2,7 +2,7 @@
 from enums import SaveMode
 from nas_state import NasState
 from module_manager import ModuleManager
-from config import DATASET, DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, NETWORK_REMAIN_PERCENTAGE, POPULATION_SIZE, UNEVALUATED_FITNESS
+from config import BEST_NETWORK_SCORE_LABEL, DATASET, DELETE_NETWORKS_EVERY, GENERATIONS, INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME, NETWORK_REMAIN_PERCENTAGE, POPULATION_SIZE, TRAINING_EPOCHS, UNEVALUATED_FITNESS
 from neural_module import NeuralModule
 from evaluation import Evaluator, NasBenchEvaluator
 from communication import Communicator
@@ -37,26 +37,25 @@ def main():
 
     for generation in range(starting_generation, GENERATIONS):
         print(f"Generation {generation}")
+        print("="*128)
         generation_training_time = 0
 
         # Inform module manager for generation change.
         manager.on_generation_increase()
-
-        # Try mutate neural modules.
-        for module in population:
-            module.mutate()
 
         # NOTE: Some modules may not be able to be evaluated, due to a pytorch issue.
         # We replace these with new modules.
         invalid_modules = []
         # Evaluate those that where mutated.
         for idx, module in enumerate(population):
+            module.mutate()
             if module.fitness == UNEVALUATED_FITNESS:
-                accuracy, time = evaluator.evaluate(module)
+                # Slowly increase the training time.
+                accuracy, time = evaluator.evaluate(module,evaluation_epochs=TRAINING_EPOCHS + generation)
                 # If the network can't be evaluated, add a new one, and mark it
                 # for deletion.
                 if accuracy == INVALID_NETWORK_FITNESS and time == INVALID_NETWORK_TIME:
-                    print(f"Network {idx} could not be evaluated, replacing.")
+                    print(f"Network {idx+1} could not be evaluated, replacing.")
                     # Add another neural module to the population.(Evaluated in 
                     # this generation)
                     population.append(NeuralModule(None, manager))
@@ -74,6 +73,7 @@ def main():
         # Print best module fitness.
         best_module = max(population, key=lambda x: x.fitness)
         print(f"Generation best module fitness: {best_module.fitness:.3f}")
+        print(f"Global best module fitness: {manager.best_network_data[BEST_NETWORK_SCORE_LABEL]:.3f}")
 
         # Remove invalid modules.
         for module in invalid_modules:
@@ -97,8 +97,6 @@ def main():
             # Logging.
             fitness_threshold = population[networks_to_keep-1].fitness
             print(f"Replacing {networks_to_create} networks. Fitness threshold: {fitness_threshold}")
-
-        print("="*50)
     
         # Save best network if it changed.
         if manager.best_module_updated == True:

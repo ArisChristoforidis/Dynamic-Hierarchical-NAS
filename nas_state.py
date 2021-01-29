@@ -175,7 +175,7 @@ class NasState:
         file_path = NasState._get_state_file_path(name, SaveMode.PICKLE)
         with bz2.BZ2File(file_path,'rb') as state_file:
             state = pickle.load(state_file)
-
+        print(f"Loaded state from {file_path.split('/')[-1]}")
         return state
 
     @staticmethod
