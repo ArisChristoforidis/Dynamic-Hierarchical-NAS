@@ -38,6 +38,7 @@ class ModuleProperties:
         
         modules_equal = self.module_type == other.module_type
         layer_equal = self.layer == other.layer
+        if self.module_type == ModuleType.NEURAL_LAYER: return modules_equal and layer_equal
         graph_equal = self.abstract_graph == other.abstract_graph
         children_equal = self.child_module_properties == other.child_module_properties
         return modules_equal and layer_equal and graph_equal and children_equal
