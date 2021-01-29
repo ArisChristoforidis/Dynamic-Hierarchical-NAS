@@ -1,12 +1,14 @@
 # Author: Aris Christoforidis.
 
-from config import BEST_MODULE_EVALUATION_EPOCHS, BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_LABEL , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
+from config import BEST_MODULE_EVALUATION_EPOCHS, BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_LABEL, MAX_CANDIDATE_MODULES , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
 from enums import ModuleType
 from module_properties import ModuleProperties
 from properties_info import PropertiesInfo, TempPropertiesInfo
 from evaluation import Evaluator
 import random as rnd
 import pickle as pkl
+from copy import deepcopy
+from bisect import bisect_left, insort
 
 class ModuleManager:
     """
@@ -19,6 +21,7 @@ class ModuleManager:
         self.evaluator = evaluator
         self._notable_modules = {ModuleProperties(ModuleType.NEURAL_LAYER, layer, None, [], 1, 0) : PropertiesInfo() for layer in evaluator.get_available_layers()}
         self._candidate_modules = {}
+        self.expired_module_hashes = []
         self.best_module_updated = False
         self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_LABEL : None }
 
@@ -73,7 +76,13 @@ class ModuleManager:
         # TODO: Remove in final version, this is a debug check.
         assert fitness != UNEVALUATED_FITNESS, "Tried to record module with unevaluated fitness."
         
-        if properties in self._notable_modules:
+        # Check if this a module we have already seen and rejected.
+        module_hash = hash(neural_module)
+        expired_idx = bisect_left(self.expired_module_hashes, module_hash)
+        if expired_idx != len(self.expired_module_hashes) and self.expired_module_hashes[expired_idx] == module_hash:
+            # Don't bother with already examined & expired modules.
+            return
+        elif properties in self._notable_modules:
                 self._notable_modules[properties].record(fitness)
         else:
             # If this is a new properties module, record it.
@@ -101,6 +110,8 @@ class ModuleManager:
             if should_delete == True: marked_for_deletion.append(module_properties)
         
         for module_properties in marked_for_deletion:
+            # Add the hash to the expired module hash list.
+            insort(self.expired_module_hashes, hash(module_properties))
             self._candidate_modules.pop(module_properties)
 
         # Get the info list and sort the list based on the average fitness 
@@ -126,7 +137,26 @@ class ModuleManager:
         
         # Delete the properties from the notable modules.
         for module_properties in marked_for_deletion:
+            insort(self.expired_module_hashes, hash(module_properties))
             self._candidate_modules.pop(module_properties)
+
+        # Check if the number of candidate modules is over the limit, and if so,
+        # keep those with the lowest complexity. 
+        if len(self._candidate_modules) > MAX_CANDIDATE_MODULES:
+            sorted_temp_info_list = sorted(list(self._candidate_modules.values()), key=lambda x:x.get_total_fitness())
+            complexity_threshold = sorted_temp_info_list[MAX_CANDIDATE_MODULES]
+
+            # Find those that need deletion
+            marked_for_deletion = []
+            for module_properties, info in self._candidate_modules.items():
+                if info.get_total_fitness() > complexity_threshold:
+                    marked_for_deletion.append(module_properties)
+            # Delete.
+            print(f"Deleted {len(marked_for_deletion)} ")
+            for module_properties in marked_for_deletion:
+                # NOTE: Don't add those modules to the expired list, they were not
+                # fully examined.
+                self._candidate_modules.pop(module_properties)
 
         # Notable module list.
         if len(self._notable_modules) > MAX_NOTABLE_MODULES:
@@ -151,6 +181,7 @@ class ModuleManager:
             # Delete marked properties.
             for properties in marked_for_deletion:
                 self._notable_modules.pop(properties)
+            
 
 
     def compare_with_best_module(self, neural_module, verbose=True):
@@ -168,13 +199,14 @@ class ModuleManager:
         """
 
         if neural_module.fitness > self.best_network_data[BEST_NETWORK_SCORE_LABEL]:
-            self.best_network_data[BEST_NETWORK_LABEL] = neural_module
+            self.best_network_data[BEST_NETWORK_LABEL] = deepcopy(neural_module)
             self.best_network_data[BEST_NETWORK_SCORE_LABEL] = neural_module.fitness
             self.best_module_updated = True
 
     def on_best_module_updated(self, verbose=True):
         # Evaluate the best module fitness on more training epochs.
         self.save_best_module()
+        print("Evaluating new best network...")
         best_module = self.best_network_data[BEST_NETWORK_LABEL]
         accuracy, _ = self.evaluator.evaluate(best_module, evaluation_epochs=BEST_MODULE_EVALUATION_EPOCHS)
         if verbose == True:
