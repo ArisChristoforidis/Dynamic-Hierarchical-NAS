@@ -46,7 +46,7 @@ class ModuleManager:
         if restrict_to == None:
             # All modules considered.
             candidates = list(self._notable_modules.keys())
-            w = [self._notable_modules[module_property].get_total_fitness() / module_property.complexity for module_property in candidates]
+            w = [self._notable_modules[module_property].get_total_fitness() for module_property in candidates]
         else:
             # NOTE: Not used.
             # Restricted to a type. May return an empty list.
