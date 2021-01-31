@@ -22,9 +22,9 @@ class PropertiesInfo:
         ----------
         fitness: The neural module fitness.
         """
-        self.occurence_count += 1
         # Recalculate the average fitness.
-        self.average_fitness = (self.get_total_fitness() + fitness) / self.occurence_count
+        self.average_fitness = (self.get_total_fitness() + fitness) / (self.occurence_count + 1)
+        self.occurence_count += 1
 
 class TempPropertiesInfo(PropertiesInfo):
 
