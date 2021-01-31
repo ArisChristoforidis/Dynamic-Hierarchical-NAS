@@ -9,6 +9,8 @@ import random as rnd
 import pickle as pkl
 from copy import deepcopy
 from bisect import bisect_left, insort
+import pandas as pd
+from tabulate import tabulate
 
 class ModuleManager:
     """
@@ -98,7 +100,6 @@ class ModuleManager:
         if neural_module.depth == 1:
             self.compare_with_best_module(neural_module)
 
-        # TODO: Delete if the new code is good.
 
     def on_generation_increase(self):
         """ Call this when a generation changes. """
@@ -182,7 +183,38 @@ class ModuleManager:
             for properties in marked_for_deletion:
                 self._notable_modules.pop(properties)
             
+        self.print_notable_modules()
 
+    def print_notable_modules(self):
+        """ Prints a table with the notable module data. """
+
+        layer_list = []
+        module_type_list = []
+        average_fitness_list = []
+        total_fitness_list = []
+        complexity_list = []
+        # Add desired properties to their respective lists.
+        for module,info in self._notable_modules.items():
+            if module.module_type == ModuleType.NEURAL_LAYER:
+                layer_list.append(module.layer)
+            else:
+                layer_list.append('N/A')
+            module_type_list.append(module.module_type)
+            average_fitness_list.append(info.average_fitness)
+            total_fitness_list.append(info.get_total_fitness())
+            complexity_list.append(module.complexity)
+
+        # Create dictionary.
+        df_dict = {
+            'LAYER' : layer_list,
+            'MODULE TYPE' : module_type_list,
+            'AVERAGE FITNESS': average_fitness_list,
+            'TOTAL FITNESS': total_fitness_list,
+            'COMPLEXITY': complexity_list
+        }
+
+        df = pd.DataFrame.from_dict(df_dict)
+        print(tabulate(df,tablefmt='fancy_grid', headers='keys', colalign='center'))
 
     def compare_with_best_module(self, neural_module, verbose=True):
         """
@@ -211,7 +243,6 @@ class ModuleManager:
         accuracy, _ = self.evaluator.evaluate(best_module, evaluation_epochs=BEST_MODULE_EVALUATION_EPOCHS)
         if verbose == True:
             print(f"A new best network was found with an accuracy value of {accuracy:.3f}")
-
 
     def save_best_module(self):
         """ Saves the best module data in a pickle file. """
