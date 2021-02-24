@@ -192,6 +192,9 @@ class AbstractNeuralEvaluator():
             if len(self.testsampler) > 0:
                 test_loss /= len(self.testsampler)
 
+        all_predicted = torch.stack(all_predicted)
+        all_targets = torch.stack(all_targets)
+
         metrics = {}
         for metric in METRIC[self.dataset]:
             metrics.update(metric(all_predicted, all_targets))

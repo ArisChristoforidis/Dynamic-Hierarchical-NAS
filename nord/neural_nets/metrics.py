@@ -4,17 +4,21 @@ from nord.utils import rank_inds_of_lists
 from scipy.stats import kendalltau, rankdata, spearmanr
 
 
+def extract_value(metric):
+    return metric.float().mean().cpu().item()
+
+
 def accuracy(predicted, targets):
-    return (predicted == targets).float().mean()
+
+    acc = extract_value(predicted.max(dim=1)[1] == targets)
+    return {'acc': acc}
 
 
 def one_hot_accuracy(predicted, targets):
-    predicted = torch.stack(predicted)
-    targets = torch.stack(targets)
-    acc = (predicted.max(dim=1)[1] == targets.max(
-        dim=1)[1]).float().mean().cpu().item()
-    return {'acc': acc}
 
+    acc = extract_value(predicted.max(dim=1)[1] == targets.max(
+        dim=1)[1])
+    return {'acc': acc}
 
 def binary_rank_correlation_tau_with_top(p, metric='kendall'):
     chosen_metric = kendalltau
