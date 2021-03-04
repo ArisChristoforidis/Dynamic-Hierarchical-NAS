@@ -1,10 +1,8 @@
 # Author: Aris Christoforidis
 
-from networkx.algorithms import graph_hashing
 from enums import ModuleType
 from networkx.algorithms.graph_hashing import weisfeiler_lehman_graph_hash
-from config import TEMP_MODULE_TTL
-
+from networkx import is_isomorphic
 class ModuleProperties:
 
     def __init__(self, module_type, layer, abstract_graph, child_module_properties, total_nodes, total_edges):
@@ -39,8 +37,8 @@ class ModuleProperties:
         modules_equal = self.module_type == other.module_type
         layer_equal = self.layer == other.layer
         if self.module_type == ModuleType.NEURAL_LAYER: return modules_equal and layer_equal
-        graph_equal = self.abstract_graph == other.abstract_graph
-        children_equal = self.child_module_properties == other.child_module_properties
+        graph_equal = is_isomorphic(self.abstract_graph, other.abstract_graph)
+        children_equal = len(self.child_module_properties) == len(other.child_module_properties) and sum([x == y for x,y in zip(self.child_module_properties, other.child_module_properties)]) == len(self.child_module_properties)
         return modules_equal and layer_equal and graph_equal and children_equal
 
     def __hash__(self):
@@ -66,5 +64,5 @@ class ModuleProperties:
                 attribute_container = tuple(attribute_container)
             # Get the hash and cache it.
             self.cached_hash = hash(attribute_container)
-        
+
         return self.cached_hash
