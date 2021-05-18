@@ -12,7 +12,7 @@ from config import NAS_STATE_SAVE_BASE_PATH, CHUNK_SIZE
 from enums import SaveMode
 from evaluation import Evaluator
 from module_manager import ModuleManager
-from metrics import PerformanceSupervisor
+from performance_supervisor import PerformanceSupervisor
 
 class NasState:
 
