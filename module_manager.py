@@ -1,6 +1,6 @@
 # Author: Aris Christoforidis.
 
-from config import BEST_MODULE_EVALUATION_EPOCHS, BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_LABEL, MAX_CANDIDATE_MODULES , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
+from config import BEST_MODULE_EVALUATION_EPOCHS, BEST_NETWORK_DATA_SAVE_BASE_PATH, BEST_NETWORK_SCORE_LABEL, BEST_NETWORK_LABEL, EVALUATED_SCORE_LABEL, MAX_CANDIDATE_MODULES , MAX_NOTABLE_MODULES, MIN_PROPERTIES_OBS_COUNT, UNEVALUATED_FITNESS
 from enums import ModuleType
 from module_properties import ModuleProperties
 from properties_info import PropertiesInfo, TempPropertiesInfo
@@ -25,7 +25,7 @@ class ModuleManager:
         self._candidate_modules = {}
         self.expired_module_hashes = []
         self.best_module_updated = False
-        self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, BEST_NETWORK_LABEL : None }
+        self.best_network_data = {BEST_NETWORK_SCORE_LABEL : -1, EVALUATED_SCORE_LABEL: -1, BEST_NETWORK_LABEL : None }
 
     def get_random_notable_modules(self,count=1, restrict_to=None):
         """
@@ -48,7 +48,7 @@ class ModuleManager:
         if restrict_to == None:
             # All modules considered.
             candidates = list(self._notable_modules.keys())
-            w = [self._notable_modules[module_property].get_total_fitness() for module_property in candidates]
+            w = [self._notable_modules[module_property].average_fitness for module_property in candidates]
         else:
             # NOTE: Not used.
             # Restricted to a type. May return an empty list.
@@ -74,6 +74,8 @@ class ModuleManager:
 
         properties = neural_module.get_module_properties()
         fitness = neural_module.fitness
+        # Random selection.
+        #fitness = 1
 
         # TODO: Remove in final version, this is a debug check.
         assert fitness != UNEVALUATED_FITNESS, "Tried to record module with unevaluated fitness."
@@ -103,7 +105,6 @@ class ModuleManager:
 
     def on_generation_increase(self):
         """ Call this when a generation changes. """
-
         # Update TTL for candidate modules and delete expired ones.
         marked_for_deletion = []
         for module_properties in self._candidate_modules:
@@ -121,7 +122,7 @@ class ModuleManager:
         info_list.sort(key=lambda x: -x.average_fitness)
         # Get the minimum fitness value.
         min_fitness_threshold = info_list[-1].average_fitness
-        
+        print(f"Fitness threshold on notables:{min_fitness_threshold}")
         # Candidate module list.
         marked_for_deletion = []
         for module_properties, temp_info in self._candidate_modules.items():
@@ -174,7 +175,7 @@ class ModuleManager:
                 # In fact this may be removed in the future with the logic being: if
                 # at some point the core layers are removed, then the mutation will 
                 # happen with just the abstracted nodes, which would contain core layers.
-                if module_properties.module_type == ModuleType.NEURAL_LAYER: continue
+                # if module_properties.module_type == ModuleType.NEURAL_LAYER: continue
                 # Compare for potential removal.
                 if info.average_fitness < min_fitness_value:
                     marked_for_deletion.append(module_properties)
@@ -235,19 +236,22 @@ class ModuleManager:
             self.best_network_data[BEST_NETWORK_SCORE_LABEL] = neural_module.fitness
             self.best_module_updated = True
 
-    def on_best_module_updated(self, verbose=True):
+    def on_best_module_updated(self, evaluate=False, verbose=True):
         # Evaluate the best module fitness on more training epochs.
         self.save_best_module()
-        print("Evaluating new best network...")
-        best_module = self.best_network_data[BEST_NETWORK_LABEL]
-        accuracy, _ = self.evaluator.evaluate(best_module, evaluation_epochs=BEST_MODULE_EVALUATION_EPOCHS)
-        if verbose == True:
-            print(f"A new best network was found with an accuracy value of {accuracy:.3f}")
+        if evaluate == True:
+            print("Evaluating new best network...")
+            best_module = self.best_network_data[BEST_NETWORK_LABEL]
+            accuracy, _ = self.evaluator.evaluate(best_module, evaluation_epochs=BEST_MODULE_EVALUATION_EPOCHS)
+            self.best_network_data[EVALUATED_SCORE_LABEL] = accuracy
+            if verbose == True:
+                print(f"A new best network was found with an accuracy value of {accuracy:.3f}")
 
     def save_best_module(self):
         """ Saves the best module data in a pickle file. """
         save_path = f"{BEST_NETWORK_DATA_SAVE_BASE_PATH}/activity_recognition_best.pkl"
         with open(save_path,'wb') as save_file:
+            #print(self.best_network_data)
             pkl.dump(self.best_network_data, save_file)
         
         # Reset the save flag.
