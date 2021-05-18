@@ -163,6 +163,7 @@ class NeuralModule:
         success: bool
             Whether the operation was successfull or not.            
         """
+        # print("Trying to add a node to the graph.")
         selected_node = rnd.choice(self.child_modules)
         if selected_node.module_type == ModuleType.ABSTRACT_MODULE:
             selected_node.mutate_node()
@@ -181,6 +182,7 @@ class NeuralModule:
         success: bool
             Whether the operation was successfull or not.
         """
+
         # Get all nodes in the abstract graph that are abstract modules.
         abstract_nodes = [node for node in self.child_modules.values() if node.module_type == ModuleType.ABSTRACT_MODULE]
         can_add_edge_to_self = True
@@ -256,7 +258,10 @@ class NeuralModule:
     def mutate(self):
         """ Perform mutation. """
         
-        sample = rnd.uniform(0,1)
+        # Do not mutate if this is a new module.
+        if self.fitness == UNEVALUATED_FITNESS: return
+        
+        sample = rnd.uniform(0,1)        
         node_mutated = False
         edge_mutated = False
         # Mutate node.
@@ -265,7 +270,7 @@ class NeuralModule:
         # Mutate edge.
         elif sample < ADD_NODE_PROBABILITY + ADD_EDGE_PROBABILITY:
             edge_mutated = self.mutate_connection()
-
+        
         # Update the fitness.
         if node_mutated or edge_mutated:
             self.on_mutation_occured()
@@ -474,7 +479,10 @@ class NeuralModule:
                     fitness_dict[node] = child_fitness
                     # Pass the fitness to the lower level(recursively of course).
                     child_module = self.child_modules[node]
-                    child_module.set_fitness(child_fitness)
+                    # NOTE: Trying Miikkulainen's fitness spread method. Change back
+                    # if it doesnt work.
+                    #child_module.set_fitness(child_fitness)
+                    child_module.set_fitness(fitness)
           
     def on_mutation_occured(self):
         """
