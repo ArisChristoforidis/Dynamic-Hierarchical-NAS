@@ -14,7 +14,8 @@ class ModuleProperties:
         # by the module properties object.
         self.total_nodes = total_nodes
         self.total_edges = total_edges
-        self.complexity = total_nodes + total_edges
+        # TODO: Revert complexity if this is too little.
+        self.complexity = total_nodes #+ total_edges
         self.cached_hash = None
 
     def __eq__(self, other):
