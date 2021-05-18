@@ -335,7 +335,7 @@ class LocalEvaluator(AbstractNeuralEvaluator):
             elif dataset == 'activity_recognition':
                 (self.trainloader,
                  self.testloader,
-                 self.classes) = get_activity_recognition_data()
+                 self.classes) = get_activity_recognition_data(differentiate=False)
 
     def set_device(self):
         """Returns the device that will run the experiment,
