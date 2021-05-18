@@ -2,23 +2,28 @@
 
 import glob
 import os
+import sys
 import pickle
+import dill
 import bz2
 from copy import deepcopy
-from config import NAS_STATE_SAVE_BASE_PATH
+from tqdm import tqdm
+from config import NAS_STATE_SAVE_BASE_PATH, CHUNK_SIZE
 from enums import SaveMode
 from evaluation import Evaluator
 from module_manager import ModuleManager
+from metrics import PerformanceSupervisor
 
 class NasState:
 
-    def __init__(self, name: str, evaluator: Evaluator):
+    def __init__(self, name: str, evaluator: Evaluator, performance_supervisor: PerformanceSupervisor):
         """
         Holds references to all critical components of the search and saves them
         when needed.
         """
         self.name = name
         self.evaluator = evaluator
+        self.performance_supervisor = performance_supervisor
         # Initialized after the first generation.
         self.module_manager = None
         self.population = None
@@ -44,7 +49,6 @@ class NasState:
         # entering the next generation.
         self.population = deepcopy(population)
         self.module_manager = deepcopy(module_manager)
-
         if mode == SaveMode.PICKLE:
             self._save_pickle(generation, ovewrite)
         elif mode == SaveMode.CONSOLE_LOG:
@@ -76,13 +80,19 @@ class NasState:
             If True overwrites the old state.
         """
         self._update_generation(generation+1)
-        save_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation}.pbz2"
-        with bz2.BZ2File(save_path,'wb') as save_file:
-            pickle.dump(self, save_file, protocol=pickle.HIGHEST_PROTOCOL)
-
+        save_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation}.dill"
+        with open(save_path,'wb') as save_file:
+            dill.dump(self, save_file)
+            '''
+            # TODO: Check if this a viable method of saving.
+            state_bytes = pickle.dumps(self)
+            for idx in tqdm(range(0,len(state_bytes),CHUNK_SIZE),desc='Saving state'):
+                chunk = state_bytes[idx:idx+CHUNK_SIZE]
+                save_file.write(chunk)
+            '''
         # Delete old file.
         if overwrite == True and self.generation > 1:
-            old_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation-1}.pbz2"
+            old_path = f"{NAS_STATE_SAVE_BASE_PATH}/nas_state_{self.name}_{self.generation-1}.dill"
             os.remove(old_path)
     
     def _save_log(self, generation: int, overwrite: bool):
@@ -145,7 +155,7 @@ class NasState:
         state_file_path: str
             The requested state file.
         """
-        ext = '.pbz2' if mode == SaveMode.PICKLE else '.log'
+        ext = '.dill' if mode == SaveMode.PICKLE else '.log'
         file_paths = glob.glob(f"{NAS_STATE_SAVE_BASE_PATH}/*")
         # Get all files that contain the name of the data set.
         file_paths = [path for path in file_paths if name in path and path.endswith(ext)]
@@ -173,8 +183,8 @@ class NasState:
             The loaded nas state.
         """
         file_path = NasState._get_state_file_path(name, SaveMode.PICKLE)
-        with bz2.BZ2File(file_path,'rb') as state_file:
-            state = pickle.load(state_file)
+        with open(file_path,'rb') as state_file:
+            state = dill.load(state_file)
         print(f"Loaded state from {file_path.split('/')[-1]}")
         return state
 
