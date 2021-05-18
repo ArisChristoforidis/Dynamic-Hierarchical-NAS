@@ -15,6 +15,7 @@ class Evaluator:
         self.evaluator = LocalEvaluator(optimizer_class=Adam, optimizer_params= {}, verbose= False)
         self.channels = CHANNEL_COUNT
         self.strides = STRIDE_COUNT
+        self.dataset = DATASET
 
     def evaluate(self, neural_module, evaluation_epochs=TRAINING_EPOCHS):
         """
@@ -33,14 +34,13 @@ class Evaluator:
         time: float
             The evaluation time.
         """
-        dim = INPUT_SHAPE[DATASET]
+        dim = INPUT_SHAPE[self.dataset]
         descriptor = self._module_to_descriptor(neural_module)
 
         fitness = {METRIC: 0}
         total_time = 0
         try:
-            print("-" * 128)
-            loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=evaluation_epochs, data_percentage=1, dataset=DATASET)
+            loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=evaluation_epochs, data_percentage=1, dataset=self.dataset)
         except Exception:
             print('Invalid Descriptor')
             print(descriptor)
@@ -89,7 +89,7 @@ class Evaluator:
                 layer = nn.Conv1d
                 # The 'H' parameter means half channels.
                 channels = self.channels if params == 'H' else int(self.channels / 2)
-                parameters = {'in_channels': 1000,
+                parameters = {'in_channels': 256,
                               'out_channels': channels,
                               'kernel_size': kernel,
                               'stride': self.strides}
@@ -229,3 +229,153 @@ class NasBenchEvaluator(Evaluator):
             descriptor.connect_layers(str(source), str(dest))
 
         return descriptor
+
+
+class FashionMnistEvaluator(Evaluator):
+    
+    def __init__(self):
+        self.evaluator = LocalEvaluator(optimizer_class=Adam, optimizer_params= {}, verbose= False)
+        self.channels = CHANNEL_COUNT
+        self.strides = STRIDE_COUNT
+        self.dataset = 'fashion-mnist'
+
+    def evaluate(self, neural_module, evaluation_epochs=TRAINING_EPOCHS):
+        """
+        Evaluates a network represented by a neural module.
+
+        Parameters
+        ---------
+        neural_module: NeuralModule
+            A neural module.
+
+        Returns
+        -------
+        acc: float
+            The network accuracy.
+        
+        time: float
+            The evaluation time.
+        """
+        dim = INPUT_SHAPE[self.dataset]
+        print("Before descriptor creation")
+        descriptor = self._module_to_descriptor(neural_module)
+        print("After descriptor creation")
+
+        fitness = {METRIC: 0}
+        total_time = 0
+        try:
+            loss, fitness, total_time = self.evaluator.descriptor_evaluate(descriptor=descriptor, epochs=evaluation_epochs, data_percentage=1, dataset=self.dataset)
+        except Exception:
+            print('Invalid Descriptor')
+            print(descriptor)
+            return INVALID_NETWORK_FITNESS, INVALID_NETWORK_TIME
+            """
+            trace = traceback.format_exc()
+            # TODO: Initialize error log.
+            traceback.print_exc()
+            """
+        # TODO: History maybe.
+
+        return fitness[METRIC], total_time
+
+    def get_available_layers(self):
+        return ['CONV_1.H', 'CONV_2.H', 'CONV_3.H', 'POOL_2.M', 'POOL_3.M', 'POOL_5.M']
+
+
+    def _module_to_descriptor(self, neural_module):
+        """
+        Converts a neural module to a descriptor object.
+
+        Parameters
+        ----------
+        neural_module: A neural module.
+
+        Returns
+        -------
+        descriptor: NeuralDescriptor
+            The neural descriptor object representing the net of the neural module.
+        """
+
+        full_graph, layer_types, input_idx, output_idx = neural_module.get_graph()
+        descriptor = NeuralDescriptor()        
+
+        # Add the rest of the nodes.
+        nodes = full_graph.nodes()
+        for node in nodes:
+            # Skip input/output node, we will add them later.
+            if node == input_idx or node == output_idx: continue
+            # Create correct layer and parameters according to layer type.
+            layer_label = layer_types[node]
+            layer_name, kernel, params = re.split(pattern=r'[_\.]',string=layer_label)
+            kernel = int(kernel)
+            is_convolutional = layer_name == 'CONV'
+            # Convolutional layer.
+            if layer_name == 'CONV':
+                layer = nn.Conv2d
+                # The 'H' parameter means half channels.
+                channels = self.channels if params == 'H' else int(self.channels / 2)
+                parameters = {'in_channels': 64,
+                              'out_channels': channels,
+                              'kernel_size': kernel,
+                              'stride': self.strides}
+            # Pooling layer.
+            elif layer_name == 'POOL':
+                layer = nn.MaxPool2d if params == 'M' else nn.AvgPool2d
+                parameters = {'kernel_size': kernel,
+                              'stride': kernel}
+            else:
+                # Not a known layer.
+                raise Exception(f'[Evaluator] Undefined layer "{layer_name}"')
+
+            # Add layer to descriptor.
+            layer_name_in = f"{node}{LAYER_INPUT_PREFIX}"
+            descriptor.add_layer(layer, parameters, name=layer_name_in)
+
+            # If dealing with a convolutional layer, add intermediate layers.
+            if is_convolutional == True:
+                # NOTE: descriptor.add_layer_sequential() causes problems(naming inconsistencies).
+                relu_layer_name = f"{node}RELU"
+                batchnorm_layer_name = f"{node}BATCHNORM"
+                dropout_layer_name = f"{node}DROPOUT"
+                descriptor.add_layer(nn.ReLU6, {}, name=relu_layer_name )
+                descriptor.add_layer(nn.BatchNorm2d, {'num_features': channels},  name=batchnorm_layer_name) 
+                descriptor.add_layer(nn.Dropout, {'p': DROPOUT_PROBABILITY},  name=dropout_layer_name)
+                # Connect layers.
+                descriptor.connect_layers(layer_name_in,relu_layer_name)
+                descriptor.connect_layers(relu_layer_name,batchnorm_layer_name)
+                descriptor.connect_layers(batchnorm_layer_name,dropout_layer_name)
+                
+            # Add layer output. This is done in this way to facilitate the extra
+            # layers that need to be added in the case of a convolutional base layer.
+            layer_name_out = f"{node}{LAYER_OUTPUT_SUFFIX}"
+            descriptor.add_layer_sequential(nn.Identity, {}, name=layer_name_out)
+
+        # Add input/output layers.
+        input_layer_name = f"{input_idx}_{NODE_INPUT_TAG}"
+        output_layer_name = f"{output_idx}_{NODE_OUTPUT_TAG}"
+        descriptor.add_layer(nn.Identity, {}, name=input_layer_name)
+        descriptor.add_layer(nn.Identity, {}, name=output_layer_name)
+        descriptor.first_layer = input_layer_name
+        descriptor.last_layer = output_layer_name
+
+        # Connect layers by iterating through the graph edges.
+        edges = full_graph.edges()
+        for source,dest in edges:
+            # Get source, dest layer names.
+            if source == input_idx:
+                source_name = f"{input_idx}_{NODE_INPUT_TAG}"
+            else:
+                layer_label = layer_types[source]
+                source_name = f"{source}{LAYER_OUTPUT_SUFFIX}"
+
+            if dest == output_idx:
+                dest_name = F"{output_idx}_{NODE_OUTPUT_TAG}"
+            else:
+                layer_label = layer_types[dest]
+                dest_name = f"{dest}{LAYER_INPUT_PREFIX}"
+
+            # Connect.
+            descriptor.connect_layers(source_name, dest_name)
+
+        return descriptor
+
